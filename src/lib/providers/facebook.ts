@@ -18,9 +18,13 @@ export const facebook: Provider = {
       client_id: requireEnv("FACEBOOK_APP_ID"),
       redirect_uri: redirectUri,
       state,
-      scope: "pages_show_list,pages_manage_posts,pages_read_engagement",
       response_type: "code",
     });
+    // Apps using Facebook Login for Business request permissions through a
+    // login configuration; classic apps pass scopes directly.
+    const configId = env("FACEBOOK_CONFIG_ID");
+    if (configId) params.set("config_id", configId);
+    else params.set("scope", "pages_show_list,pages_manage_posts,pages_read_engagement");
     return `https://www.facebook.com/${env("FACEBOOK_GRAPH_VERSION") ?? "v23.0"}/dialog/oauth?${params}`;
   },
 

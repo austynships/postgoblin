@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { db, now } from "./db";
+import { now, one, run } from "./db";
 import { randomToken } from "./crypto";
 
 export const SESSION_COOKIE = "pg_session";
@@ -9,11 +9,7 @@ export type User = { id: string; email: string; name: string; timezone: string }
 
 export async function createSession(userId: string) {
   const token = randomToken();
-  db.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)").run(
-    token,
-    userId,
-    now() + SESSION_TTL,
-  );
+  await run("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)", [token, userId, now() + SESSION_TTL]);
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -27,19 +23,18 @@ export async function createSession(userId: string) {
 export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+  if (token) await run("DELETE FROM sessions WHERE token = ?", [token]);
   jar.delete(SESSION_COOKIE);
 }
 
 export async function currentUser(): Promise<User | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const row = db
-    .prepare(
-      `SELECT u.id, u.email, u.name, u.timezone FROM sessions s JOIN users u ON u.id = s.user_id
-       WHERE s.token = ? AND s.expires_at > ?`,
-    )
-    .get(token, now()) as User | undefined;
+  const row = await one<User>(
+    `SELECT u.id, u.email, u.name, u.timezone FROM sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.token = ? AND s.expires_at > ?`,
+    [token, now()],
+  );
   return row ?? null;
 }
 
@@ -70,6 +65,11 @@ export function handler<A extends unknown[]>(fn: (...args: A) => Promise<Respons
   };
 }
 
+/** Public base URL. On Vercel, falls back to the production domain when APP_URL is unset. */
 export function appUrl() {
-  return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const explicit = process.env.APP_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  if (vercel) return `https://${vercel}`;
+  return "http://localhost:3000";
 }

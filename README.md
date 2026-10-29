@@ -36,9 +36,26 @@ and set `APP_URL=https://localhost:3000` in `.env`. Register the `https://localh
 redirect URLs in each developer portal. The first run may ask Windows/macOS to trust the local certificate.
 Threads image posts still need a public URL (tunnel or real hosting), because Threads downloads media from your server.
 
-Production: `npm run build && npm start`. The scheduler runs inside the Next.js server process, so use a
-long-running Node host (VPS, Docker, Railway, Fly, Render), not serverless functions.
-Data lives in `data/postgoblins.db` (SQLite) and `uploads/`, so back up both.
+Data lives in **Postgres** (Neon recommended; schema in `db/schema.sql`), so `DATABASE_URL` is required even
+locally. Uploads go to **Vercel Blob** when `BLOB_READ_WRITE_TOKEN` is set, otherwise to `./uploads`.
+Locally, an in-process scheduler publishes due posts every `SCHEDULER_INTERVAL` seconds.
+
+## Deploying to Vercel
+
+1. **Database.** Create a Neon Postgres database and run `db/schema.sql` against it (safe to re-run).
+2. **Blob storage.** In the Vercel project: Storage → Create → Blob, and connect it to the project. This adds
+   `BLOB_READ_WRITE_TOKEN` automatically.
+3. **Environment variables** (Project → Settings → Environment Variables): `DATABASE_URL`, `ENCRYPTION_KEY`
+   (the **same** value you use locally, or saved accounts can't be decrypted), `CRON_SECRET`,
+   `APP_URL=https://<your-domain>`, plus `ANTHROPIC_API_KEY` and any platform keys you use.
+4. **Redirect URLs.** Register `https://<your-domain>/api/oauth/callback/<platform>` in each developer portal.
+5. **Scheduler.** Posts are published by `GET /api/cron/publish`, which must be called **every minute**:
+   - **Vercel Pro:** change the schedule in `vercel.json` to `* * * * *`. Vercel sends the `CRON_SECRET` header itself.
+   - **Vercel Hobby** (cron limited to once a day): create a free job at [cron-job.org](https://cron-job.org) that
+     requests `https://<your-domain>/api/cron/publish` every minute with the header
+     `Authorization: Bearer <CRON_SECRET>`. The daily Vercel cron in `vercel.json` stays as a safety net.
+
+"Post now" and retries publish immediately after the request, without waiting for the cron.
 
 ## Configuration (`.env`)
 

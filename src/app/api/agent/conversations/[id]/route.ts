@@ -5,11 +5,11 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export const GET = handler(async (_req: Request, { params }: Ctx) => {
   const user = await requireUser();
-  return Response.json({ items: getConversation(user.id, (await params).id) });
+  return Response.json({ items: await getConversation(user.id, (await params).id) });
 });
 
 export const DELETE = handler(async (_req: Request, { params }: Ctx) => {
   const user = await requireUser();
-  deleteConversation(user.id, (await params).id);
+  await deleteConversation(user.id, (await params).id);
   return Response.json({ ok: true });
 });

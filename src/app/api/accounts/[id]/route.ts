@@ -3,6 +3,6 @@ import { handler, requireUser } from "@/lib/auth";
 
 export const DELETE = handler(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await requireUser();
-  deleteAccount(user.id, (await params).id);
+  await deleteAccount(user.id, (await params).id);
   return Response.json({ ok: true });
 });

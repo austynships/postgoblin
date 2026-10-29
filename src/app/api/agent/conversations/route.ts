@@ -3,5 +3,5 @@ import { handler, requireUser } from "@/lib/auth";
 
 export const GET = handler(async () => {
   const user = await requireUser();
-  return Response.json({ conversations: listConversations(user.id) });
+  return Response.json({ conversations: await listConversations(user.id) });
 });

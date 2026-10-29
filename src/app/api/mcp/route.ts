@@ -95,7 +95,7 @@ export async function POST(req: Request) {
   if (origin && origin !== new URL(appUrl()).origin) {
     return Response.json({ error: "Origin not allowed" }, { status: 403 });
   }
-  const user = userFromApiKey(req);
+  const user = await userFromApiKey(req);
   if (!user) return unauthorized();
 
   let body: RpcMessage | RpcMessage[];

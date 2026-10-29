@@ -1,6 +1,6 @@
 import { saveConnectedAccounts } from "@/lib/accounts";
 import { appUrl, currentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { one } from "@/lib/db";
 import { getProvider } from "@/lib/providers";
 
 function back(params: Record<string, string>) {
@@ -17,12 +17,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   const user = await currentUser();
   if (!user) return Response.redirect(`${appUrl()}/login`, 302);
 
+  // Single use: the state row is consumed whether or not the exchange succeeds.
   const row = state
-    ? (db.prepare("SELECT * FROM oauth_states WHERE state = ?").get(state) as
-        | { user_id: string; provider: string; verifier: string; extra: string }
-        | undefined)
+    ? await one<{ user_id: string; provider: string; verifier: string; extra: string }>(
+        "DELETE FROM oauth_states WHERE state = ? RETURNING user_id, provider, verifier, extra",
+        [state],
+      )
     : undefined;
-  if (state) db.prepare("DELETE FROM oauth_states WHERE state = ?").run(state);
 
   if (denied) return back({ error: `Connection cancelled: ${denied}` });
   if (!row || row.user_id !== user.id || row.provider !== providerId || !code) {
@@ -38,7 +39,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
       extra: JSON.parse(row.extra),
     });
     if (!accounts.length) return back({ error: `No ${provider.name} accounts were found to connect.` });
-    saveConnectedAccounts(user.id, providerId, accounts);
+    await saveConnectedAccounts(user.id, providerId, accounts);
     return back({ connected: `${accounts.length} ${provider.name} account${accounts.length > 1 ? "s" : ""}` });
   } catch (err) {
     console.error(err);

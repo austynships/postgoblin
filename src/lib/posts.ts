@@ -1,7 +1,7 @@
 import { getAccountsByIds } from "./accounts";
 import { HttpError } from "./auth";
 import { id } from "./crypto";
-import { db, now } from "./db";
+import { all, now, one, run, tx } from "./db";
 import { CHAR_LIMITS, countChars } from "./limits";
 import { getMedia, publicMedia, type PublicMedia } from "./media";
 import { getProvider } from "./providers";
@@ -52,51 +52,52 @@ export type PostInput = {
   scheduledAt?: number | null;
 };
 
-function hydrate(userId: string, rows: PostRow[]): PostView[] {
+async function hydrate(userId: string, rows: PostRow[]): Promise<PostView[]> {
   if (!rows.length) return [];
-  const targets = db
-    .prepare(
-      `SELECT t.post_id, t.account_id, t.status, t.remote_url, t.error, t.attempts, a.provider, a.name, a.avatar
-       FROM post_targets t JOIN accounts a ON a.id = t.account_id
-       WHERE t.post_id IN (${rows.map(() => "?").join(",")})`,
-    )
-    .all(...rows.map((r) => r.id)) as any[];
-  return rows.map((r) => {
-    const mediaIds = JSON.parse(r.media) as string[];
-    let media: PublicMedia[] = [];
-    try {
-      media = getMedia(userId, mediaIds).map(publicMedia);
-    } catch {}
-    return {
-      id: r.id,
-      content: r.content,
-      media,
-      status: r.status,
-      scheduledAt: r.scheduled_at,
-      publishedAt: r.published_at,
-      createdBy: r.created_by,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-      targets: targets
-        .filter((t) => t.post_id === r.id)
-        .map((t) => ({
-          accountId: t.account_id,
-          provider: t.provider,
-          accountName: t.name,
-          avatar: t.avatar,
-          status: t.status,
-          remoteUrl: t.remote_url,
-          error: t.error,
-          attempts: t.attempts,
-        })),
-    };
-  });
+  const targets = await all(
+    `SELECT t.post_id, t.account_id, t.status, t.remote_url, t.error, t.attempts, a.provider, a.name, a.avatar
+     FROM post_targets t JOIN accounts a ON a.id = t.account_id
+     WHERE t.post_id IN (${rows.map(() => "?").join(",")})`,
+    rows.map((r) => r.id),
+  );
+  return Promise.all(
+    rows.map(async (r) => {
+      const mediaIds = JSON.parse(r.media) as string[];
+      let media: PublicMedia[] = [];
+      try {
+        media = (await getMedia(userId, mediaIds)).map(publicMedia);
+      } catch {}
+      return {
+        id: r.id,
+        content: r.content,
+        media,
+        status: r.status,
+        scheduledAt: r.scheduled_at,
+        publishedAt: r.published_at,
+        createdBy: r.created_by,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        targets: targets
+          .filter((t) => t.post_id === r.id)
+          .map((t) => ({
+            accountId: t.account_id,
+            provider: t.provider,
+            accountName: t.name,
+            avatar: t.avatar,
+            status: t.status,
+            remoteUrl: t.remote_url,
+            error: t.error,
+            attempts: t.attempts,
+          })),
+      };
+    }),
+  );
 }
 
-export function listPosts(
+export async function listPosts(
   userId: string,
   opts: { from?: number; to?: number; status?: PostStatus[]; limit?: number } = {},
-): PostView[] {
+): Promise<PostView[]> {
   const where = ["user_id = ?"];
   const args: unknown[] = [userId];
   if (opts.from !== undefined) {
@@ -111,31 +112,30 @@ export function listPosts(
     where.push(`status IN (${opts.status.map(() => "?").join(",")})`);
     args.push(...opts.status);
   }
-  const rows = db
-    .prepare(
-      `SELECT * FROM posts WHERE ${where.join(" AND ")}
-       ORDER BY COALESCE(scheduled_at, published_at, created_at) ASC LIMIT ?`,
-    )
-    .all(...args, Math.min(opts.limit ?? 500, 1000)) as PostRow[];
+  const rows = await all<PostRow>(
+    `SELECT * FROM posts WHERE ${where.join(" AND ")}
+     ORDER BY COALESCE(scheduled_at, published_at, created_at) ASC LIMIT ?`,
+    [...args, Math.min(opts.limit ?? 500, 1000)],
+  );
   return hydrate(userId, rows);
 }
 
-export function getPost(userId: string, postId: string): PostView {
-  const row = db.prepare("SELECT * FROM posts WHERE id = ? AND user_id = ?").get(postId, userId) as PostRow | undefined;
+export async function getPost(userId: string, postId: string): Promise<PostView> {
+  const row = await one<PostRow>("SELECT * FROM posts WHERE id = ? AND user_id = ?", [postId, userId]);
   if (!row) throw new HttpError(404, "Post not found");
-  return hydrate(userId, [row])[0];
+  return (await hydrate(userId, [row]))[0];
 }
 
 /** Validates content against every selected platform. Throws with all problems listed. */
-function validate(userId: string, input: PostInput) {
+async function validate(userId: string, input: PostInput) {
   const content = input.content?.trim() ?? "";
   const mediaIds = input.mediaIds ?? [];
   if (!content && !mediaIds.length) throw new HttpError(400, "Post content is empty");
   if (input.mode !== "draft" && !input.accountIds.length) {
     throw new HttpError(400, "Choose at least one account to publish to");
   }
-  const accounts = getAccountsByIds(userId, input.accountIds);
-  const media = getMedia(userId, mediaIds);
+  const accounts = await getAccountsByIds(userId, input.accountIds);
+  const media = await getMedia(userId, mediaIds);
   const problems: string[] = [];
   for (const a of accounts) {
     const p = getProvider(a.provider);
@@ -144,7 +144,6 @@ function validate(userId: string, input: PostInput) {
       problems.push(`${p.name} (${a.name}): ${n}/${CHAR_LIMITS[a.provider]} characters`);
     }
     if (media.length > p.maxMedia) problems.push(`${p.name}: at most ${p.maxMedia} media files`);
-    if (a.provider === "x" && !content && media.length === 0) problems.push("X requires text or media");
   }
   if (input.mode === "schedule") {
     if (!input.scheduledAt || Number.isNaN(input.scheduledAt)) throw new HttpError(400, "Pick a date and time");
@@ -160,24 +159,31 @@ function statusFor(mode: PostInput["mode"]): PostStatus {
   return mode === "draft" ? "draft" : "scheduled";
 }
 
-export function createPost(userId: string, input: PostInput, createdBy: "user" | "agent" = "user"): PostView {
-  const { content, mediaIds } = validate(userId, input);
+function targetInserts(postId: string, accountIds: string[]): [string, unknown[]][] {
+  return [...new Set(accountIds)].map((acc) => [
+    "INSERT INTO post_targets (id, post_id, account_id) VALUES (?, ?, ?)",
+    [id("tgt_"), postId, acc],
+  ]);
+}
+
+export async function createPost(userId: string, input: PostInput, createdBy: "user" | "agent" = "user"): Promise<PostView> {
+  const { content, mediaIds } = await validate(userId, input);
   const postId = id("post_");
   const t = now();
   const scheduledAt = input.mode === "now" ? t : (input.scheduledAt ?? null);
-  db.transaction(() => {
-    db.prepare(
+  await tx([
+    [
       `INSERT INTO posts (id, user_id, content, media, status, scheduled_at, created_by, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(postId, userId, content, JSON.stringify(mediaIds), statusFor(input.mode), scheduledAt, createdBy, t, t);
-    const ins = db.prepare("INSERT INTO post_targets (id, post_id, account_id) VALUES (?, ?, ?)");
-    for (const acc of new Set(input.accountIds)) ins.run(id("tgt_"), postId, acc);
-  })();
+      [postId, userId, content, JSON.stringify(mediaIds), statusFor(input.mode), scheduledAt, createdBy, t, t],
+    ],
+    ...targetInserts(postId, input.accountIds),
+  ]);
   return getPost(userId, postId);
 }
 
-export function updatePost(userId: string, postId: string, patch: Partial<PostInput>): PostView {
-  const existing = getPost(userId, postId);
+export async function updatePost(userId: string, postId: string, patch: Partial<PostInput>): Promise<PostView> {
+  const existing = await getPost(userId, postId);
   if (existing.status === "publishing" || existing.status === "published" || existing.status === "partial") {
     throw new HttpError(409, `Post is ${existing.status} and can no longer be edited`);
   }
@@ -188,39 +194,36 @@ export function updatePost(userId: string, postId: string, patch: Partial<PostIn
     mode: patch.mode ?? (existing.status === "draft" ? "draft" : "schedule"),
     scheduledAt: patch.scheduledAt !== undefined ? patch.scheduledAt : existing.scheduledAt,
   };
-  const { content, mediaIds } = validate(userId, merged);
+  const { content, mediaIds } = await validate(userId, merged);
   const scheduledAt = merged.mode === "now" ? now() : (merged.scheduledAt ?? null);
-  db.transaction(() => {
-    db.prepare(
+  // Targets are reset: a failed post that is rescheduled gets fresh attempts.
+  await tx([
+    [
       "UPDATE posts SET content = ?, media = ?, status = ?, scheduled_at = ?, updated_at = ? WHERE id = ?",
-    ).run(content, JSON.stringify(mediaIds), statusFor(merged.mode), scheduledAt, now(), postId);
-    // Reset targets: a failed post that is rescheduled gets fresh attempts.
-    db.prepare("DELETE FROM post_targets WHERE post_id = ?").run(postId);
-    const ins = db.prepare("INSERT INTO post_targets (id, post_id, account_id) VALUES (?, ?, ?)");
-    for (const acc of new Set(merged.accountIds)) ins.run(id("tgt_"), postId, acc);
-  })();
+      [content, JSON.stringify(mediaIds), statusFor(merged.mode), scheduledAt, now(), postId],
+    ],
+    ["DELETE FROM post_targets WHERE post_id = ?", [postId]],
+    ...targetInserts(postId, merged.accountIds),
+  ]);
   return getPost(userId, postId);
 }
 
-export function deletePost(userId: string, postId: string) {
-  const post = getPost(userId, postId);
+export async function deletePost(userId: string, postId: string) {
+  const post = await getPost(userId, postId);
   if (post.status === "publishing") throw new HttpError(409, "Post is publishing right now — try again in a moment");
-  db.prepare("DELETE FROM posts WHERE id = ? AND user_id = ?").run(postId, userId);
+  await run("DELETE FROM posts WHERE id = ? AND user_id = ?", [postId, userId]);
 }
 
 /** Re-queue only the targets that failed (keeps successful ones). */
-export function retryFailed(userId: string, postId: string): PostView {
-  const post = getPost(userId, postId);
+export async function retryFailed(userId: string, postId: string): Promise<PostView> {
+  const post = await getPost(userId, postId);
   if (!post.targets.some((t) => t.status === "failed")) throw new HttpError(400, "Nothing to retry");
-  db.transaction(() => {
-    db.prepare(
+  await tx([
+    [
       "UPDATE post_targets SET status = 'pending', attempts = 0, next_attempt_at = NULL, error = NULL WHERE post_id = ? AND status = 'failed'",
-    ).run(postId);
-    db.prepare("UPDATE posts SET status = 'scheduled', scheduled_at = ?, updated_at = ? WHERE id = ?").run(
-      now(),
-      now(),
-      postId,
-    );
-  })();
+      [postId],
+    ],
+    ["UPDATE posts SET status = 'scheduled', scheduled_at = ?, updated_at = ? WHERE id = ?", [now(), now(), postId]],
+  ]);
   return getPost(userId, postId);
 }

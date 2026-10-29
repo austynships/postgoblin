@@ -1,7 +1,7 @@
 import { saveConnectedAccounts } from "@/lib/accounts";
 import { HttpError, appUrl, handler, requireUser } from "@/lib/auth";
 import { randomToken } from "@/lib/crypto";
-import { db, now } from "@/lib/db";
+import { now, run } from "@/lib/db";
 import { getProvider } from "@/lib/providers";
 
 /**
@@ -19,7 +19,7 @@ export const POST = handler(async (req: Request, { params }: { params: Promise<{
 
   if (provider.connect === "form") {
     const accounts = await provider.connectForm!(values);
-    saveConnectedAccounts(user.id, provider.id, accounts);
+    await saveConnectedAccounts(user.id, provider.id, accounts);
     return Response.json({ connected: accounts.length });
   }
 
@@ -29,8 +29,9 @@ export const POST = handler(async (req: Request, { params }: { params: Promise<{
   const extra = { ...values };
   const redirectUri = `${appUrl()}/api/oauth/callback/${provider.id}`;
   const url = await provider.startOAuth!({ state, redirectUri, verifier, extra });
-  db.prepare(
+  await run(
     "INSERT INTO oauth_states (state, user_id, provider, verifier, extra, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(state, user.id, provider.id, verifier, JSON.stringify(extra), now());
+    [state, user.id, provider.id, verifier, JSON.stringify(extra), now()],
+  );
   return Response.json({ redirect: url });
 });

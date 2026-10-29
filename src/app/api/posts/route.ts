@@ -1,12 +1,12 @@
 import { HttpError, handler, requireUser } from "@/lib/auth";
 import { createPost, listPosts, type PostStatus } from "@/lib/posts";
-import { runDue } from "@/lib/scheduler";
+import { publishSoon } from "@/lib/scheduler";
 
 export const GET = handler(async (req: Request) => {
   const user = await requireUser();
   const q = new URL(req.url).searchParams;
   const num = (k: string) => (q.get(k) ? Number(q.get(k)) : undefined);
-  const posts = listPosts(user.id, {
+  const posts = await listPosts(user.id, {
     from: num("from"),
     to: num("to"),
     status: q.get("status")?.split(",").filter(Boolean) as PostStatus[] | undefined,
@@ -19,13 +19,13 @@ export const POST = handler(async (req: Request) => {
   const user = await requireUser();
   const body = await req.json();
   if (!["draft", "schedule", "now"].includes(body.mode)) throw new HttpError(400, "Invalid mode");
-  const post = createPost(user.id, {
+  const post = await createPost(user.id, {
     content: String(body.content ?? ""),
     accountIds: body.accountIds ?? [],
     mediaIds: body.mediaIds ?? [],
     mode: body.mode,
     scheduledAt: body.scheduledAt ?? null,
   });
-  if (body.mode === "now") void runDue();
+  if (body.mode === "now") publishSoon();
   return Response.json({ post });
 });

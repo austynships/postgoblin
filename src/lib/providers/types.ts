@@ -31,8 +31,10 @@ export type ConnectedAccount = {
 
 export type MediaFile = {
   id: string;
-  path: string;
+  /** Absolute URL (Vercel Blob, or {APP_URL}/api/media/… for local files). */
   url: string;
+  /** Set when the file lives on local disk (development without Blob). */
+  localPath?: string;
   mime: string;
   name: string;
   size: number;

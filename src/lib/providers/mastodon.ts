@@ -1,4 +1,4 @@
-import { db } from "../db";
+import { one, run } from "../db";
 import { api, form, readMedia } from "./http";
 import { ProviderError, type Provider } from "./types";
 
@@ -13,9 +13,10 @@ function normalizeInstance(input: string) {
 
 /** Mastodon apps are registered per server, on demand. */
 async function appFor(instance: string, redirectUri: string): Promise<App> {
-  const existing = db
-    .prepare("SELECT client_id, client_secret, redirect_uri FROM mastodon_apps WHERE instance = ?")
-    .get(instance) as App | undefined;
+  const existing = await one<App>(
+    "SELECT client_id, client_secret, redirect_uri FROM mastodon_apps WHERE instance = ?",
+    [instance],
+  );
   if (existing && existing.redirect_uri === redirectUri) return existing;
 
   const app = await api(
@@ -31,11 +32,12 @@ async function appFor(instance: string, redirectUri: string): Promise<App> {
     },
     "Mastodon app registration",
   );
-  db.prepare(
+  await run(
     `INSERT INTO mastodon_apps (instance, client_id, client_secret, redirect_uri) VALUES (?, ?, ?, ?)
-     ON CONFLICT(instance) DO UPDATE SET client_id = excluded.client_id,
+     ON CONFLICT (instance) DO UPDATE SET client_id = excluded.client_id,
        client_secret = excluded.client_secret, redirect_uri = excluded.redirect_uri`,
-  ).run(instance, app.client_id, app.client_secret, redirectUri);
+    [instance, app.client_id, app.client_secret, redirectUri],
+  );
   return { client_id: app.client_id, client_secret: app.client_secret, redirect_uri: redirectUri };
 }
 

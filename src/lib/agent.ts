@@ -2,11 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { listAccounts } from "./accounts";
 import { HttpError, type User } from "./auth";
 import { id } from "./crypto";
-import { db, now } from "./db";
+import { all, now, one, run, tx } from "./db";
 import { CHAR_LIMITS, countChars } from "./limits";
 import { publicMedia, getMedia } from "./media";
 import { createPost, deletePost, getPost, listPosts, retryFailed, updatePost, type PostStatus, type PostView } from "./posts";
-import { runDue } from "./scheduler";
+import { publishSoon } from "./scheduler";
 import { isoInZone, parseIsoWithOffset, zonedToEpoch } from "./time";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
@@ -220,7 +220,7 @@ export async function runTool(
       return { result: { now: isoInZone(now(), tz), timezone: tz, user: user.name } };
     case "list_accounts":
       return {
-        result: listAccounts(user.id).map((a) => ({
+        result: (await listAccounts(user.id)).map((a) => ({
           id: a.id,
           platform: a.provider,
           name: a.name,
@@ -232,17 +232,19 @@ export async function runTool(
       };
     case "list_posts":
       return {
-        result: listPosts(user.id, {
-          status: input.status as PostStatus[] | undefined,
-          from: time(input.from),
-          to: time(input.to),
-          limit: input.limit ?? 50,
-        }).map((p) => summarizePost(p, tz)),
+        result: (
+          await listPosts(user.id, {
+            status: input.status as PostStatus[] | undefined,
+            from: time(input.from),
+            to: time(input.to),
+            limit: input.limit ?? 50,
+          })
+        ).map((p) => summarizePost(p, tz)),
       };
     case "get_post":
-      return { result: summarizePost(getPost(user.id, input.post_id), tz) };
+      return { result: summarizePost(await getPost(user.id, input.post_id), tz) };
     case "create_post": {
-      const post = createPost(
+      const post = await createPost(
         user.id,
         {
           content: input.content,
@@ -253,7 +255,7 @@ export async function runTool(
         },
         "agent",
       );
-      if (input.mode === "now") void runDue();
+      if (input.mode === "now") publishSoon();
       const verb = input.mode === "draft" ? "Drafted" : input.mode === "now" ? "Publishing" : "Scheduled";
       return {
         result: summarizePost(post, tz),
@@ -261,37 +263,37 @@ export async function runTool(
       };
     }
     case "update_post": {
-      const post = updatePost(user.id, input.post_id, {
+      const post = await updatePost(user.id, input.post_id, {
         content: input.content,
         accountIds: input.account_ids,
         mediaIds: input.media_ids,
         mode: input.mode,
         scheduledAt: input.scheduled_at !== undefined ? time(input.scheduled_at) : undefined,
       });
-      if (input.mode === "now") void runDue();
+      if (input.mode === "now") publishSoon();
       return {
         result: summarizePost(post, tz),
         action: { tool: name, ok: true, postId: post.id, summary: `Updated: “${post.content.slice(0, 60)}”` },
       };
     }
     case "delete_post": {
-      const post = getPost(user.id, input.post_id);
-      deletePost(user.id, input.post_id);
+      const post = await getPost(user.id, input.post_id);
+      await deletePost(user.id, input.post_id);
       return {
         result: { deleted: true },
         action: { tool: name, ok: true, summary: `Deleted: “${post.content.slice(0, 60)}”` },
       };
     }
     case "retry_post": {
-      const post = retryFailed(user.id, input.post_id);
-      void runDue();
+      const post = await retryFailed(user.id, input.post_id);
+      publishSoon();
       return {
         result: summarizePost(post, tz),
         action: { tool: name, ok: true, postId: post.id, summary: "Retrying failed deliveries" },
       };
     }
     case "find_open_slots": {
-      const taken = listPosts(user.id, { status: ["scheduled"], from: now(), limit: 1000 })
+      const taken = (await listPosts(user.id, { status: ["scheduled"], from: now(), limit: 1000 }))
         .map((p) => p.scheduledAt!)
         .filter(Boolean);
       const today = isoInZone(now(), tz).slice(0, 10);
@@ -315,11 +317,12 @@ export async function runTool(
     }
     case "list_media": {
       const ids = (
-        db
-          .prepare("SELECT id FROM media WHERE user_id = ? ORDER BY created_at DESC LIMIT ?")
-          .all(user.id, input.limit ?? 20) as { id: string }[]
+        await all<{ id: string }>("SELECT id FROM media WHERE user_id = ? ORDER BY created_at DESC LIMIT ?", [
+          user.id,
+          input.limit ?? 20,
+        ])
       ).map((r) => r.id);
-      return { result: getMedia(user.id, ids).map(publicMedia) };
+      return { result: (await getMedia(user.id, ids)).map(publicMedia) };
     }
     default:
       throw new Error(`Unknown tool ${name}`);
@@ -328,32 +331,33 @@ export async function runTool(
 
 // ---------- conversation storage (append-only, so thinking blocks stay valid) ----------
 
-function loadMessages(conversationId: string): MessageParam[] {
-  return (
-    db
-      .prepare("SELECT role, content FROM conversation_messages WHERE conversation_id = ? ORDER BY seq")
-      .all(conversationId) as { role: "user" | "assistant"; content: string }[]
-  ).map((r) => ({ role: r.role, content: JSON.parse(r.content) }));
+async function loadMessages(conversationId: string): Promise<MessageParam[]> {
+  const rows = await all<{ role: "user" | "assistant"; content: string }>(
+    "SELECT role, content FROM conversation_messages WHERE conversation_id = ? ORDER BY seq",
+    [conversationId],
+  );
+  return rows.map((r) => ({ role: r.role, content: JSON.parse(r.content) }));
 }
 
-function appendMessage(conversationId: string, message: MessageParam) {
-  db.prepare("INSERT INTO conversation_messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)").run(
-    conversationId,
-    message.role,
-    JSON.stringify(message.content),
-    now(),
-  );
-  db.prepare("UPDATE conversations SET updated_at = ? WHERE id = ?").run(now(), conversationId);
+async function appendMessage(conversationId: string, message: MessageParam) {
+  await tx([
+    [
+      "INSERT INTO conversation_messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)",
+      [conversationId, message.role, JSON.stringify(message.content), now()],
+    ],
+    ["UPDATE conversations SET updated_at = ? WHERE id = ?", [now(), conversationId]],
+  ]);
 }
 
 export function listConversations(userId: string) {
-  return db
-    .prepare("SELECT id, title, updated_at AS updatedAt FROM conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50")
-    .all(userId) as { id: string; title: string; updatedAt: number }[];
+  return all<{ id: string; title: string; updatedAt: number }>(
+    `SELECT id, title, updated_at AS "updatedAt" FROM conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50`,
+    [userId],
+  );
 }
 
-export function deleteConversation(userId: string, conversationId: string) {
-  db.prepare("DELETE FROM conversations WHERE id = ? AND user_id = ?").run(conversationId, userId);
+export async function deleteConversation(userId: string, conversationId: string) {
+  await run("DELETE FROM conversations WHERE id = ? AND user_id = ?", [conversationId, userId]);
 }
 
 export type ChatItem =
@@ -364,14 +368,12 @@ export type ChatItem =
 const CONTEXT_RE = /^<context>[\s\S]*?<\/context>\s*/;
 
 /** Turns the stored API transcript into a simple display transcript. */
-export function getConversation(userId: string, conversationId: string): ChatItem[] {
-  const owner = db.prepare("SELECT user_id FROM conversations WHERE id = ?").get(conversationId) as
-    | { user_id: string }
-    | undefined;
+export async function getConversation(userId: string, conversationId: string): Promise<ChatItem[]> {
+  const owner = await one<{ user_id: string }>("SELECT user_id FROM conversations WHERE id = ?", [conversationId]);
   if (!owner || owner.user_id !== userId) throw new HttpError(404, "Conversation not found");
   const items: ChatItem[] = [];
   const toolNames = new Map<string, string>();
-  for (const m of loadMessages(conversationId)) {
+  for (const m of await loadMessages(conversationId)) {
     const blocks = typeof m.content === "string" ? [{ type: "text", text: m.content }] : (m.content as any[]);
     for (const b of blocks) {
       if (b.type === "text" && b.text.trim()) {
@@ -395,19 +397,19 @@ export async function chat(user: User, opts: { conversationId?: string; message:
   const tz = opts.timezone;
   let conversationId = opts.conversationId;
   if (conversationId) {
-    getConversation(user.id, conversationId); // ownership check
+    await getConversation(user.id, conversationId); // ownership check
   } else {
     conversationId = id("conv_");
-    db.prepare("INSERT INTO conversations (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run(
+    await run("INSERT INTO conversations (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", [
       conversationId,
       user.id,
       opts.message.slice(0, 80),
       now(),
       now(),
-    );
+    ]);
   }
 
-  const messages = loadMessages(conversationId);
+  const messages = await loadMessages(conversationId);
   const userMessage: MessageParam = {
     role: "user",
     content: [
@@ -418,7 +420,7 @@ export async function chat(user: User, opts: { conversationId?: string; message:
     ],
   };
   messages.push(userMessage);
-  appendMessage(conversationId, userMessage);
+  await appendMessage(conversationId, userMessage);
 
   const actions: Action[] = [];
   const replyParts: string[] = [];
@@ -435,7 +437,7 @@ export async function chat(user: User, opts: { conversationId?: string; message:
     // Persist the full content (incl. thinking/fallback blocks) unchanged.
     const assistant: MessageParam = { role: "assistant", content: response.content as any };
     messages.push(assistant);
-    appendMessage(conversationId, assistant);
+    await appendMessage(conversationId, assistant);
 
     for (const b of response.content) if (b.type === "text" && b.text.trim()) replyParts.push(b.text);
 
@@ -465,7 +467,7 @@ export async function chat(user: User, opts: { conversationId?: string; message:
     // All results for one assistant turn go back in a single user message.
     const toolMessage: MessageParam = { role: "user", content: results };
     messages.push(toolMessage);
-    appendMessage(conversationId, toolMessage);
+    await appendMessage(conversationId, toolMessage);
   }
 
   return { conversationId, reply: replyParts.join("\n\n"), actions };

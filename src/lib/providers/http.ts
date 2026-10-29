@@ -40,7 +40,10 @@ export function form(data: Record<string, string | undefined>) {
 }
 
 export async function readMedia(file: MediaFile) {
-  return new Blob([await fs.readFile(file.path)], { type: file.mime });
+  if (file.localPath) return new Blob([await fs.readFile(file.localPath)], { type: file.mime });
+  const res = await fetch(file.url, { signal: AbortSignal.timeout(60_000) });
+  if (!res.ok) throw new ProviderError(`Couldn't download media ${file.name} (${res.status})`);
+  return new Blob([await res.arrayBuffer()], { type: file.mime });
 }
 
 export function env(name: string) {

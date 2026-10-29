@@ -3,11 +3,11 @@ import { handler, requireUser } from "@/lib/auth";
 
 export const GET = handler(async () => {
   const user = await requireUser();
-  return Response.json({ keys: listApiKeys(user.id) });
+  return Response.json({ keys: await listApiKeys(user.id) });
 });
 
 export const POST = handler(async (req: Request) => {
   const user = await requireUser();
   const { name } = await req.json().catch(() => ({}));
-  return Response.json(createApiKey(user.id, String(name ?? "")));
+  return Response.json(await createApiKey(user.id, String(name ?? "")));
 });

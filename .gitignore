@@ -3,6 +3,7 @@ node_modules
 .env
 .env.local
 data/*.db*
+.vercel
 uploads/*
 !uploads/.gitkeep
 next-env.d.ts

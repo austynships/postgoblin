@@ -24,6 +24,18 @@ cp .env.example .env      # then fill in ENCRYPTION_KEY (and optionally the rest
 npm run dev               # http://localhost:3000
 ```
 
+### Local HTTPS (needed for Threads)
+
+Threads only accepts `https://` redirect URLs, so to connect Threads locally run the dev server over HTTPS:
+
+```bash
+npm run dev:https         # https://localhost:3000 (self-signed certificate, created on first run)
+```
+
+and set `APP_URL=https://localhost:3000` in `.env`. Register the `https://localhost:3000/api/oauth/callback/<platform>`
+redirect URLs in each developer portal. The first run may ask Windows/macOS to trust the local certificate.
+Threads image posts still need a public URL (tunnel or real hosting), because Threads downloads media from your server.
+
 Production: `npm run build && npm start`. The scheduler runs inside the Next.js server process, so use a
 long-running Node host (VPS, Docker, Railway, Fly, Render), not serverless functions.
 Data lives in `data/postgoblins.db` (SQLite) and `uploads/`, so back up both.
@@ -39,6 +51,7 @@ Data lives in `data/postgoblins.db` (SQLite) and `uploads/`, so back up both.
 | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | LinkedIn app with *OpenID Connect* + *Share on LinkedIn*; `LINKEDIN_VERSION` sets the API version header |
 | `THREADS_APP_ID` / `THREADS_APP_SECRET` | Meta app with the Threads use case |
 | `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET` | Meta app with `pages_manage_posts`, `pages_show_list` |
+| `FACEBOOK_CONFIG_ID` | Required for Meta business apps using *Facebook Login for Business*: the login configuration ID (Facebook Login for Business → Configurations) |
 | `SCHEDULER_INTERVAL` | Seconds between scheduler ticks (default 20) |
 
 **No server keys needed:** Bluesky (app password), Mastodon (the app registers itself on each server), Discord

@@ -21,7 +21,7 @@ export const threads: Provider = {
       response_type: "code",
       state,
     });
-    return `https://threads.net/oauth/authorize?${params}`;
+    return `https://www.threads.com/oauth/authorize?${params}`;
   },
 
   async finishOAuth({ code, redirectUri }) {

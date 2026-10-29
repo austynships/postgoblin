@@ -1,0 +1,82 @@
+# 👺 PostGoblins
+
+Agentic social media scheduling. Users sign up, connect their **own** social accounts, and create, schedule and
+publish posts — by hand, with an AI agent, or from any external AI agent over **MCP**.
+
+## Features
+
+- **Calendar** (week / month) and **Posts** list (upcoming, drafts, published, failed)
+- **Composer** with multi-account targeting, per-platform character counters, image/video upload, live preview,
+  schedule / post now / save draft, and one-click **AI assist** (rewrite, shorten, hashtags, generate)
+- **Goblin agent**: a Claude-powered chat agent that reads your accounts and calendar and acts on them:
+  plans campaigns, writes platform-native copy, picks open time slots, schedules, edits, deletes and retries posts
+- **MCP server** at `/api/mcp` so Claude Code, Claude Desktop, Cursor or your own agents can drive PostGoblins
+- **Background scheduler** with atomic claiming (no double posts), per-account delivery status, automatic retries with
+  backoff (1 min, 4 min), token refresh, and crash recovery
+- **Integrations**: X, Bluesky, Mastodon, LinkedIn, Threads, Facebook Pages, Discord, Telegram
+- Multi-user email/password auth; social tokens are **encrypted at rest** (AES-256-GCM)
+
+## Quick start
+
+```bash
+npm install
+cp .env.example .env      # then fill in ENCRYPTION_KEY (and optionally the rest)
+npm run dev               # http://localhost:3000
+```
+
+Production: `npm run build && npm start`. The scheduler runs inside the Next.js server process, so use a
+long-running Node host (VPS, Docker, Railway, Fly, Render), not serverless functions.
+Data lives in `data/postgoblins.db` (SQLite) and `uploads/`, so back up both.
+
+## Configuration (`.env`)
+
+| Variable | Purpose |
+| --- | --- |
+| `APP_URL` | Public base URL. OAuth redirect URIs are `{APP_URL}/api/oauth/callback/{provider}` |
+| `ENCRYPTION_KEY` | 32+ random chars; encrypts stored tokens. **Don't lose or change it.** |
+| `ANTHROPIC_API_KEY` | Enables the agent and AI assist. `ANTHROPIC_MODEL` (default `claude-opus-5-5`) and `ANTHROPIC_EFFORT` (default `medium`) are optional |
+| `X_CLIENT_ID` / `X_CLIENT_SECRET` | X OAuth 2.0 app (confidential client) |
+| `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | LinkedIn app with *OpenID Connect* + *Share on LinkedIn*; `LINKEDIN_VERSION` sets the API version header |
+| `THREADS_APP_ID` / `THREADS_APP_SECRET` | Meta app with the Threads use case |
+| `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET` | Meta app with `pages_manage_posts`, `pages_show_list` |
+| `SCHEDULER_INTERVAL` | Seconds between scheduler ticks (default 20) |
+
+**No server keys needed:** Bluesky (app password), Mastodon (the app registers itself on each server), Discord
+(channel webhook) and Telegram (bot token + channel). Platforms without credentials show as "Server setup needed".
+
+Notes:
+- **Threads** fetches images by URL, so image posts need `APP_URL` to be publicly reachable.
+- **LinkedIn** tokens last 60 days and, for most apps, can't be refreshed, so users reconnect when warned.
+- **X** API posting requires a paid API tier.
+
+## MCP server
+
+Each user creates API keys under **Settings & MCP**. The endpoint is stateless Streamable HTTP:
+
+```bash
+claude mcp add --transport http postgoblins https://your-host/api/mcp --header "Authorization: Bearer pg_..."
+```
+
+Tools: `get_current_time`, `list_accounts`, `list_posts`, `get_post`, `create_post`, `update_post`, `delete_post`,
+`retry_post`, `find_open_slots`, `list_media`. Read-only tools carry `readOnlyHint`, and `delete_post` carries
+`destructiveHint`. Keys are stored hashed and can be revoked at any time.
+
+## Architecture
+
+```
+src/
+  instrumentation.ts        starts the scheduler with the server
+  lib/
+    db.ts                   SQLite schema (better-sqlite3)
+    auth.ts, crypto.ts      sessions, password hashing, token encryption
+    posts.ts                post CRUD + per-platform validation
+    scheduler.ts            due-post publisher, retries, token refresh
+    agent.ts                Claude tool-use agent + tools (shared with MCP)
+    apikeys.ts              API keys for MCP
+    providers/*.ts          one file per platform (connect, refresh, publish)
+  app/api/...               REST routes, OAuth callback, /api/mcp
+  components/...            React UI
+```
+
+To add a platform, implement the `Provider` interface in `src/lib/providers/types.ts` and register it in
+`providers/index.ts`.

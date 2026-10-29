@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ProviderIcon, StatusPill, fmtDateTime, postTime, request, type PostView } from "./ui";
+import { GoblinIcon, ProviderIcon, StatusPill, fmtDateTime, postTime, request, type PostView } from "./ui";
 
 const FILTERS = [
   { id: "upcoming", label: "Upcoming", status: "scheduled,publishing" },
@@ -44,38 +44,42 @@ export default function PostsList({
 
   return (
     <div className="mx-auto max-w-4xl">
-      <h1 className="mb-4 text-xl font-semibold">Posts</h1>
-      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-white/8">
+      <h1 className="font-display mb-4 text-3xl">Posts</h1>
+      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-ink/10">
         {FILTERS.map((f) => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
             className={`-mb-px border-b-2 px-4 py-2 text-sm whitespace-nowrap ${
-              filter === f.id ? "border-goblin-500 text-white" : "border-transparent text-zinc-400 hover:text-zinc-200"
+              filter === f.id ? "border-goblin-500 text-ink" : "border-transparent text-ink/60 hover:text-ink"
             }`}
           >
             {f.label}
           </button>
         ))}
       </div>
-      {error && <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       {posts === null ? (
-        <p className="text-sm text-zinc-500">Loading…</p>
+        <p className="text-sm text-ink/50">Loading…</p>
       ) : posts.length === 0 ? (
-        <div className="card p-10 text-center text-sm text-zinc-400">Nothing here yet.</div>
+        <div className="card p-10 text-center text-sm text-ink/60">Nothing here yet.</div>
       ) : (
         <ul className="space-y-3">
           {posts.map((p) => (
             <li key={p.id} className="card p-4">
-              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-ink/60">
                 <StatusPill status={p.status} />
                 <span>
                   {p.status === "draft" ? "Draft · edited " + fmtDateTime(p.updatedAt) : fmtDateTime(postTime(p))}
                 </span>
-                {p.createdBy === "agent" && <span title="Created by the agent">· 👺 agent</span>}
+                {p.createdBy === "agent" && (
+                  <span className="flex items-center gap-1" title="Created by the agent">
+                    · <GoblinIcon size={14} /> agent
+                  </span>
+                )}
               </div>
-              <p className="mb-3 line-clamp-4 text-sm whitespace-pre-wrap text-zinc-200">{p.content || "(media only)"}</p>
+              <p className="mb-3 line-clamp-4 text-sm whitespace-pre-wrap text-ink">{p.content || "(media only)"}</p>
               {p.media.length > 0 && (
                 <div className="mb-3 flex gap-1.5">
                   {p.media.map((m) =>
@@ -83,7 +87,7 @@ export default function PostsList({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img key={m.id} src={m.url} alt="" className="h-12 w-12 rounded object-cover" />
                     ) : (
-                      <span key={m.id} className="grid h-12 w-12 place-items-center rounded bg-zinc-800 text-xs">▶</span>
+                      <span key={m.id} className="grid h-12 w-12 place-items-center rounded bg-ink/10 text-xs">▶</span>
                     ),
                   )}
                 </div>
@@ -93,13 +97,13 @@ export default function PostsList({
                   {p.targets.map((t) => (
                     <span
                       key={t.accountId}
-                      className="flex items-center gap-1.5 rounded-full border border-white/10 py-0.5 pr-2.5 pl-1 text-xs"
+                      className="flex items-center gap-1.5 rounded-full border border-ink/15 py-0.5 pr-2.5 pl-1 text-xs"
                       title={t.error ?? undefined}
                     >
                       <ProviderIcon provider={t.provider} size={16} />
                       <span className="max-w-[120px] truncate">{t.accountName}</span>
                       {t.remoteUrl ? (
-                        <a href={t.remoteUrl} target="_blank" rel="noreferrer" className="text-goblin-400 hover:underline">
+                        <a href={t.remoteUrl} target="_blank" rel="noreferrer" className="text-goblin-800 hover:underline">
                           ↗
                         </a>
                       ) : (
@@ -122,7 +126,7 @@ export default function PostsList({
               {p.targets
                 .filter((t) => t.error && t.status !== "published")
                 .map((t) => (
-                  <p key={t.accountId} className="mt-2 text-xs break-words text-red-300">
+                  <p key={t.accountId} className="mt-2 text-xs break-words text-red-700">
                     {t.accountName}: {t.error}
                     {t.status === "pending" && ` (retrying, attempt ${t.attempts + 1})`}
                   </p>

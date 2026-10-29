@@ -139,12 +139,12 @@ export default function Composer({
 
   return (
     <Modal onClose={onClose} wide>
-      <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
+      <div className="flex items-center justify-between border-b border-ink/10 px-5 py-4">
         <div className="flex items-center gap-3">
           <h2 className="font-semibold">{post ? (locked ? "Post details" : "Edit post") : "Create post"}</h2>
           {post && <StatusPill status={post.status} />}
         </div>
-        <button className="text-zinc-400 hover:text-white" onClick={onClose} aria-label="Close">✕</button>
+        <button className="text-ink/60 hover:text-white" onClick={onClose} aria-label="Close">✕</button>
       </div>
 
       <div className="grid gap-0 lg:grid-cols-[1fr_340px]">
@@ -153,9 +153,9 @@ export default function Composer({
           <div>
             <div className="label">Publish to</div>
             {accounts.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-white/15 p-4 text-sm text-zinc-400">
+              <div className="rounded-lg border border-dashed border-ink/20 p-4 text-sm text-ink/60">
                 No accounts connected yet.{" "}
-                <button className="text-goblin-400 hover:underline" onClick={onGoToAccounts}>
+                <button className="text-goblin-800 hover:underline" onClick={onGoToAccounts}>
                   Connect one
                 </button>{" "}
                 — you can still save drafts.
@@ -171,12 +171,12 @@ export default function Composer({
                       onClick={() => toggle(a.id)}
                       title={`${a.providerName} · ${a.name}${a.status !== "active" ? " (needs attention)" : ""}`}
                       className={`flex items-center gap-2 rounded-full border py-1 pr-3 pl-1 text-sm transition ${
-                        on ? "border-goblin-500/60 bg-goblin-500/10" : "border-white/10 opacity-50 grayscale hover:opacity-80"
+                        on ? "border-goblin-500/60 bg-goblin-500/10" : "border-ink/15 opacity-50 grayscale hover:opacity-80"
                       }`}
                     >
                       <Avatar account={a} size={26} />
                       <span className="max-w-[140px] truncate">{a.name}</span>
-                      {a.status !== "active" && <span className="text-amber-400">!</span>}
+                      {a.status !== "active" && <span className="text-amber-700">!</span>}
                     </button>
                   );
                 })}
@@ -196,7 +196,7 @@ export default function Composer({
             />
             <div className="mt-2 flex flex-wrap items-center gap-3">
               {counts.map(({ p, n, max }) => (
-                <span key={p} className={`flex items-center gap-1.5 text-xs ${n > max ? "text-red-400" : "text-zinc-400"}`}>
+                <span key={p} className={`flex items-center gap-1.5 text-xs ${n > max ? "text-red-700" : "text-ink/60"}`}>
                   <ProviderIcon provider={p} size={14} />
                   {n}/{max}
                 </span>
@@ -207,14 +207,14 @@ export default function Composer({
           {/* AI assist */}
           {!locked && aiEnabled && (
             <div className="rounded-lg border border-goblin-500/20 bg-goblin-500/[0.04] p-3">
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-goblin-300">✨ AI assist</div>
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-goblin-800">✨ AI assist</div>
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {QUICK.map((q) => (
                   <button
                     key={q}
                     disabled={!!busy}
                     onClick={() => runAi(q)}
-                    className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/5"
+                    className="rounded-full border border-ink/15 px-2.5 py-1 text-xs text-ink/80 hover:bg-goblin-100"
                   >
                     {q}
                   </button>
@@ -245,7 +245,7 @@ export default function Composer({
             <div className="label">Media</div>
             <div className="flex flex-wrap gap-2">
               {media.map((m) => (
-                <div key={m.id} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-white/10">
+                <div key={m.id} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-ink/15">
                   {m.mime.startsWith("video/") ? (
                     <video src={m.url} className="h-full w-full object-cover" muted />
                   ) : (
@@ -267,7 +267,7 @@ export default function Composer({
                 <button
                   onClick={() => fileRef.current?.click()}
                   disabled={busy === "upload"}
-                  className="grid h-20 w-20 place-items-center rounded-lg border border-dashed border-white/15 text-xs text-zinc-400 hover:border-white/30"
+                  className="grid h-20 w-20 place-items-center rounded-lg border border-dashed border-ink/20 text-xs text-ink/60 hover:border-ink/30"
                 >
                   {busy === "upload" ? "…" : "+ Add"}
                 </button>
@@ -292,13 +292,13 @@ export default function Composer({
                   <li key={t.accountId} className="flex items-start gap-2 text-sm">
                     <ProviderIcon provider={t.provider} size={16} />
                     <span className="min-w-0 flex-1">
-                      <span className="text-zinc-300">{t.accountName}</span> <StatusPill status={t.status} />
+                      <span className="text-ink/80">{t.accountName}</span> <StatusPill status={t.status} />
                       {t.remoteUrl && (
-                        <a className="ml-2 text-goblin-400 hover:underline" href={t.remoteUrl} target="_blank" rel="noreferrer">
+                        <a className="ml-2 text-goblin-800 hover:underline" href={t.remoteUrl} target="_blank" rel="noreferrer">
                           View ↗
                         </a>
                       )}
-                      {t.error && <div className="mt-0.5 text-xs break-words text-red-300">{t.error}</div>}
+                      {t.error && <div className="mt-0.5 text-xs break-words text-red-700">{t.error}</div>}
                     </span>
                   </li>
                 ))}
@@ -308,33 +308,33 @@ export default function Composer({
         </div>
 
         {/* Right rail: schedule + preview */}
-        <div className="space-y-5 border-t border-white/8 p-5 lg:border-t-0 lg:border-l">
+        <div className="space-y-5 border-t border-ink/10 p-5 lg:border-t-0 lg:border-l">
           {!locked && (
             <div>
               <label className="label" htmlFor="when">Schedule for</label>
               <input id="when" type="datetime-local" className="input" value={when} onChange={(e) => setWhen(e.target.value)} />
-              <p className="mt-1 text-xs text-zinc-500">{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+              <p className="mt-1 text-xs text-ink/50">{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
             </div>
           )}
 
           <div>
             <div className="label">Preview</div>
-            <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+            <div className="rounded-xl border border-ink/15 bg-white p-4">
               <div className="mb-3 flex items-center gap-2.5">
                 {previewAccount ? (
                   <Avatar account={previewAccount} size={36} />
                 ) : (
-                  <span className="h-9 w-9 rounded-full bg-zinc-800" />
+                  <span className="h-9 w-9 rounded-full bg-ink/10" />
                 )}
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold">{previewAccount?.name ?? "Your account"}</div>
-                  <div className="truncate text-xs text-zinc-500">
+                  <div className="truncate text-xs text-ink/50">
                     {previewAccount ? (previewAccount.username ?? providerName(previewAccount.provider)) : "Pick an account"}
                   </div>
                 </div>
               </div>
-              <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-zinc-200">
-                {content || <span className="text-zinc-600">Your post will appear here…</span>}
+              <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-ink">
+                {content || <span className="text-ink/40">Your post will appear here…</span>}
               </p>
               {media.length > 0 && (
                 <div className={`mt-3 grid gap-1 ${media.length > 1 ? "grid-cols-2" : ""}`}>
@@ -351,9 +351,9 @@ export default function Composer({
             </div>
           </div>
 
-          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm break-words text-red-300">{error}</p>}
+          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm break-words text-red-700">{error}</p>}
           {tooLong && !error && (
-            <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+            <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
               Too long for {counts.filter((c) => c.n > c.max).map((c) => providerName(c.p)).join(", ")}. Shorten it or
               deselect those accounts.
             </p>

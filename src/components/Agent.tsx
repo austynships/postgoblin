@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { request } from "./ui";
+import { GoblinIcon, request } from "./ui";
 
 type Item =
   | { kind: "user"; text: string }
@@ -23,7 +23,7 @@ function Rich({ text }: { text: string }) {
       part.startsWith("**") ? (
         <strong key={i}>{part.slice(2, -2)}</strong>
       ) : part.startsWith("`") ? (
-        <code key={i} className="rounded bg-white/10 px-1 text-[0.9em]">{part.slice(1, -1)}</code>
+        <code key={i} className="rounded bg-goblin-100 px-1 text-[0.9em]">{part.slice(1, -1)}</code>
       ) : (
         part
       ),
@@ -33,8 +33,8 @@ function Rich({ text }: { text: string }) {
       {text.split("\n").map((line, i) => {
         const bullet = line.match(/^\s*[-*•]\s+(.*)/);
         const num = line.match(/^\s*(\d+)[.)]\s+(.*)/);
-        if (bullet) return <div key={i} className="flex gap-2 pl-1"><span className="text-zinc-500">•</span><span>{inline(bullet[1])}</span></div>;
-        if (num) return <div key={i} className="flex gap-2 pl-1"><span className="text-zinc-500">{num[1]}.</span><span>{inline(num[2])}</span></div>;
+        if (bullet) return <div key={i} className="flex gap-2 pl-1"><span className="text-ink/50">•</span><span>{inline(bullet[1])}</span></div>;
+        if (num) return <div key={i} className="flex gap-2 pl-1"><span className="text-ink/50">{num[1]}.</span><span>{inline(num[2])}</span></div>;
         if (/^#{1,4}\s/.test(line)) return <div key={i} className="pt-1 font-semibold">{inline(line.replace(/^#+\s/, ""))}</div>;
         return line.trim() ? <p key={i}>{inline(line)}</p> : <div key={i} className="h-1" />;
       })}
@@ -117,10 +117,10 @@ export default function Agent({
   if (!aiEnabled) {
     return (
       <div className="card mx-auto max-w-xl p-8 text-center">
-        <div className="text-4xl">👺</div>
-        <h1 className="mt-3 text-lg font-semibold">The agent is asleep</h1>
-        <p className="mt-2 text-sm text-zinc-400">
-          Add <code className="rounded bg-white/10 px-1">ANTHROPIC_API_KEY</code> to your <code>.env</code> file and restart
+        <GoblinIcon size={88} className="mx-auto" />
+        <h1 className="font-display mt-3 text-2xl">The agent is asleep</h1>
+        <p className="mt-2 text-sm text-ink/60">
+          Add <code className="rounded bg-goblin-100 px-1">ANTHROPIC_API_KEY</code> to your <code>.env</code> file and restart
           the server to let the agent plan, write and schedule posts for you.
         </p>
       </div>
@@ -145,14 +145,14 @@ export default function Agent({
               <button
                 onClick={() => open(c.id)}
                 className={`flex-1 truncate rounded-lg px-3 py-2 text-left text-sm ${
-                  active === c.id ? "bg-white/[0.07]" : "text-zinc-400 hover:bg-white/[0.04]"
+                  active === c.id ? "bg-goblin-100" : "text-ink/60 hover:bg-ink/[0.04]"
                 }`}
               >
                 {c.title}
               </button>
               <button
                 onClick={() => remove(c.id)}
-                className="hidden px-2 text-xs text-zinc-500 group-hover:block hover:text-red-300"
+                className="hidden px-2 text-xs text-ink/50 group-hover:block hover:text-red-700"
                 aria-label="Delete chat"
               >
                 ✕
@@ -166,14 +166,14 @@ export default function Agent({
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           {items.length === 0 && (
             <div className="mx-auto max-w-xl pt-8 text-center">
-              <div className="text-5xl">👺</div>
-              <h1 className="mt-3 text-lg font-semibold">Goblin, your social media agent</h1>
-              <p className="mt-1 text-sm text-zinc-400">
+              <GoblinIcon size={112} className="mx-auto" />
+              <h1 className="font-display mt-3 text-2xl">Goblin, your social media agent</h1>
+              <p className="mt-1 text-sm text-ink/60">
                 Ask me to write posts, plan a content calendar, reschedule things or check what failed. I act directly
                 on your calendar.
               </p>
               {!hasAccounts && (
-                <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+                <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
                   Connect an account first so I have somewhere to post — I can still write drafts.
                 </p>
               )}
@@ -182,7 +182,7 @@ export default function Agent({
                   <button
                     key={s}
                     onClick={() => (s.endsWith("…") ? setInput(s.replace("…", "")) : send(s))}
-                    className="rounded-lg border border-white/10 p-3 text-sm text-zinc-300 hover:bg-white/[0.04]"
+                    className="rounded-lg border border-ink/15 p-3 text-sm text-ink/80 hover:bg-ink/[0.04]"
                   >
                     {s}
                   </button>
@@ -196,17 +196,20 @@ export default function Agent({
               <div key={i} className="flex justify-center">
                 <span
                   className={`rounded-full px-3 py-1 text-xs ${
-                    it.ok ? "bg-goblin-500/10 text-goblin-300" : "bg-red-500/10 text-red-300"
+                    it.ok ? "bg-goblin-500/10 text-goblin-800" : "bg-red-500/10 text-red-700"
                   }`}
                 >
                   {it.ok ? "✓" : "✕"} {it.summary}
                 </span>
               </div>
             ) : (
-              <div key={i} className={`flex ${it.kind === "user" ? "justify-end" : "justify-start"}`}>
+              <div key={i} className={`flex items-end gap-2 ${it.kind === "user" ? "justify-end" : "justify-start"}`}>
+                {it.kind === "assistant" && <GoblinIcon size={30} />}
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                    it.kind === "user" ? "bg-goblin-500/15 whitespace-pre-wrap text-zinc-100" : "bg-white/[0.04] text-zinc-200"
+                    it.kind === "user"
+                      ? "rounded-br-sm bg-goblin-500/20 whitespace-pre-wrap text-ink"
+                      : "rounded-bl-sm border border-ink/10 bg-white text-ink"
                   }`}
                 >
                   {it.kind === "user" ? it.text : <Rich text={it.text} />}
@@ -215,16 +218,16 @@ export default function Agent({
             ),
           )}
           {busy && (
-            <div className="flex items-center gap-2 text-sm text-zinc-400">
-              <span className="animate-pulse">👺</span> Working on it…
+            <div className="flex items-center gap-2 text-sm text-ink/60">
+              <GoblinIcon size={22} className="animate-bounce" /> Goblin is working on it…
             </div>
           )}
-          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>}
           <div ref={bottom} />
         </div>
 
         <form
-          className="flex gap-2 border-t border-white/8 p-3"
+          className="flex gap-2 border-t border-ink/10 p-3"
           onSubmit={(e) => {
             e.preventDefault();
             send(input);

@@ -9,7 +9,7 @@ function Copy({ text }: { text: string }) {
   const [done, setDone] = useState(false);
   return (
     <button
-      className="text-xs text-zinc-400 hover:text-white"
+      className="text-xs text-ink/60 hover:text-white"
       onClick={() => {
         navigator.clipboard.writeText(text);
         setDone(true);
@@ -25,10 +25,10 @@ function Snippet({ title, code }: { title: string; code: string }) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-medium text-zinc-300">{title}</span>
+        <span className="text-xs font-medium text-ink/80">{title}</span>
         <Copy text={code} />
       </div>
-      <pre className="overflow-x-auto rounded-lg border border-white/8 bg-black/40 p-3 text-xs leading-relaxed text-zinc-300">
+      <pre className="overflow-x-auto rounded-lg border border-ink/10 bg-ink/[0.03] p-3 text-xs leading-relaxed text-ink/80">
         {code}
       </pre>
     </div>
@@ -87,13 +87,13 @@ export default function Settings({ timezone, onTimezoneSaved }: { timezone: stri
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div>
-        <h1 className="text-xl font-semibold">Settings</h1>
-        {error && <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+        <h1 className="font-display text-3xl">Settings</h1>
+        {error && <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>}
       </div>
 
       <section className="card space-y-3 p-5">
         <h2 className="font-semibold">Timezone</h2>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-ink/60">
           Used by external AI agents (MCP) to interpret times like “tomorrow at 9am”.
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -102,22 +102,22 @@ export default function Settings({ timezone, onTimezoneSaved }: { timezone: stri
           {browserTz && browserTz !== tz && (
             <button className="btn-ghost" onClick={() => saveTz(browserTz)}>Use {browserTz}</button>
           )}
-          {msg && <span className="text-sm text-goblin-300">{msg}</span>}
+          {msg && <span className="text-sm text-goblin-800">{msg}</span>}
         </div>
       </section>
 
       <section className="card space-y-5 p-5">
         <div>
           <h2 className="font-semibold">MCP server · connect your AI agents</h2>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-ink/60">
             PostGoblins speaks the Model Context Protocol. Any MCP client — Claude Code, Claude Desktop, Cursor, your own
             agents — can list your accounts, draft, schedule, reschedule and retry posts with an API key.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg border border-white/8 bg-black/30 px-3 py-2">
-          <span className="text-xs text-zinc-500">Endpoint</span>
-          <code className="flex-1 truncate text-sm text-goblin-300">{mcpUrl}</code>
+        <div className="flex items-center gap-2 rounded-lg border border-ink/10 bg-white px-3 py-2">
+          <span className="text-xs text-ink/50">Endpoint</span>
+          <code className="flex-1 truncate text-sm text-goblin-800">{mcpUrl}</code>
           <Copy text={mcpUrl} />
         </div>
 
@@ -134,25 +134,25 @@ export default function Settings({ timezone, onTimezoneSaved }: { timezone: stri
         {fresh && (
           <div className="rounded-lg border border-goblin-500/40 bg-goblin-500/10 p-3">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-sm font-medium text-goblin-300">Your new key — copy it now, it won&apos;t be shown again</span>
+              <span className="text-sm font-medium text-goblin-800">Your new key — copy it now, it won&apos;t be shown again</span>
               <Copy text={fresh} />
             </div>
-            <code className="block text-sm break-all text-zinc-100">{fresh}</code>
+            <code className="block text-sm break-all text-ink">{fresh}</code>
           </div>
         )}
 
         {keys.length > 0 && (
-          <ul className="divide-y divide-white/5 rounded-lg border border-white/8">
+          <ul className="divide-y divide-ink/10 rounded-lg border border-ink/10">
             {keys.map((k) => (
               <li key={k.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
                 <div className="min-w-0 flex-1">
                   <div className="truncate">{k.name}</div>
-                  <div className="text-xs text-zinc-500">
+                  <div className="text-xs text-ink/50">
                     {k.prefix}… · created {new Date(k.createdAt).toLocaleDateString()} ·{" "}
                     {k.lastUsedAt ? `last used ${new Date(k.lastUsedAt).toLocaleString()}` : "never used"}
                   </div>
                 </div>
-                <button className="text-xs text-zinc-500 hover:text-red-300" onClick={() => revoke(k)}>
+                <button className="text-xs text-ink/50 hover:text-red-700" onClick={() => revoke(k)}>
                   Revoke
                 </button>
               </li>
@@ -173,7 +173,7 @@ export default function Settings({ timezone, onTimezoneSaved }: { timezone: stri
               2,
             )}
           />
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-ink/50">
             Tools: get_current_time, list_accounts, list_posts, get_post, create_post, update_post, delete_post,
             retry_post, find_open_slots, list_media. Keys act as you — treat them like passwords.
           </p>

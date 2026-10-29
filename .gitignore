@@ -8,3 +8,4 @@ uploads/*
 !uploads/.gitkeep
 next-env.d.ts
 *.tsbuildinfo
+.env.vercel

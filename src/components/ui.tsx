@@ -31,11 +31,11 @@ const SHORT: Record<string, string> = {
 };
 
 export const PROVIDER_COLORS: Record<string, string> = {
-  x: "#e7e9ea",
+  x: "#000000",
   bluesky: "#1185fe",
   mastodon: "#6364ff",
   linkedin: "#0a66c2",
-  threads: "#e7e9ea",
+  threads: "#000000",
   facebook: "#0866ff",
   discord: "#5865f2",
   telegram: "#229ed9",
@@ -43,7 +43,6 @@ export const PROVIDER_COLORS: Record<string, string> = {
 
 export function ProviderIcon({ provider, size = 18 }: { provider: string; size?: number }) {
   const color = PROVIDER_COLORS[provider] ?? "#888";
-  const dark = provider === "x" || provider === "threads";
   return (
     <span
       className="inline-grid shrink-0 place-items-center rounded-full font-bold leading-none"
@@ -52,7 +51,7 @@ export function ProviderIcon({ provider, size = 18 }: { provider: string; size?:
         height: size,
         fontSize: size * 0.55,
         background: color,
-        color: dark ? "#000" : "#fff",
+        color: "#fff",
       }}
       aria-label={provider}
     >
@@ -73,11 +72,11 @@ export function Avatar({ account, size = 36 }: { account: { avatar: string | nul
           referrerPolicy="no-referrer"
         />
       ) : (
-        <span className="grid h-full w-full place-items-center rounded-full bg-zinc-800 text-sm font-semibold text-zinc-300">
+        <span className="grid h-full w-full place-items-center rounded-full bg-ink/10 text-sm font-semibold text-ink/80">
           {account.name.slice(0, 1).toUpperCase()}
         </span>
       )}
-      <span className="absolute -right-1 -bottom-1 rounded-full ring-2 ring-[#121513]">
+      <span className="absolute -right-1 -bottom-1 rounded-full ring-2 ring-white">
         <ProviderIcon provider={account.provider} size={Math.max(14, size * 0.42)} />
       </span>
     </span>
@@ -85,14 +84,14 @@ export function Avatar({ account, size = 36 }: { account: { avatar: string | nul
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  draft: "bg-zinc-500/15 text-zinc-300",
-  scheduled: "bg-sky-500/15 text-sky-300",
-  publishing: "bg-amber-500/15 text-amber-300",
-  sending: "bg-amber-500/15 text-amber-300",
-  pending: "bg-sky-500/15 text-sky-300",
-  published: "bg-goblin-500/15 text-goblin-300",
-  partial: "bg-orange-500/15 text-orange-300",
-  failed: "bg-red-500/15 text-red-300",
+  draft: "bg-ink/10 text-ink/80",
+  scheduled: "bg-sky-500/15 text-sky-700",
+  publishing: "bg-amber-500/15 text-amber-700",
+  sending: "bg-amber-500/15 text-amber-700",
+  pending: "bg-sky-500/15 text-sky-700",
+  published: "bg-goblin-500/15 text-goblin-800",
+  partial: "bg-orange-500/15 text-orange-700",
+  failed: "bg-red-500/15 text-red-700",
 };
 
 export function StatusPill({ status }: { status: string }) {
@@ -106,11 +105,34 @@ export function StatusPill({ status }: { status: string }) {
 export function Modal({ children, onClose, wide }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/50 p-4 backdrop-blur-sm sm:p-8"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className={`card w-full ${wide ? "max-w-5xl" : "max-w-lg"} shadow-2xl`}>{children}</div>
     </div>
+  );
+}
+
+/** The goblin mascot (public/brand/icon.png). */
+export function GoblinIcon({ size = 24, className = "" }: { size?: number; className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/brand/icon.png" alt="" width={size} height={size} className={`shrink-0 ${className}`} />
+  );
+}
+
+/** Full PostGoblins wordmark (public/brand/logo.png, 720×234). */
+export function Logo({ height = 40, className = "" }: { height?: number; className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/brand/logo.png"
+      alt="PostGoblins"
+      height={height}
+      width={Math.round((height * 720) / 234)}
+      className={className}
+      style={{ height, width: "auto" }}
+    />
   );
 }
 

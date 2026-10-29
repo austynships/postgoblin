@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { request } from "./ui";
+import { Logo, request } from "./ui";
 
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [error, setError] = useState("");
@@ -29,10 +29,10 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <main className="grid min-h-screen place-items-center px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="text-5xl">👺</div>
-          <h1 className="mt-3 text-2xl font-semibold">PostGoblins</h1>
-          <p className="mt-1 text-sm text-zinc-400">Your agentic social media scheduler</p>
+        <div className="mb-8 flex flex-col items-center text-center">
+          <h1 className="sr-only">PostGoblins</h1>
+          <Logo height={112} className="max-w-full" />
+          <p className="mt-3 text-sm text-ink/60">Your agentic social media scheduler</p>
         </div>
         <form onSubmit={submit} className="card space-y-4 p-6">
           {signup && (
@@ -57,14 +57,14 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
               autoComplete={signup ? "new-password" : "current-password"}
             />
           </div>
-          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>}
           <button className="btn-primary w-full" disabled={busy}>
             {busy ? "…" : signup ? "Create account" : "Sign in"}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-zinc-400">
+        <p className="mt-4 text-center text-sm text-ink/60">
           {signup ? "Already have an account? " : "New here? "}
-          <Link className="text-goblin-400 hover:underline" href={signup ? "/login" : "/signup"}>
+          <Link className="text-goblin-800 hover:underline" href={signup ? "/login" : "/signup"}>
             {signup ? "Sign in" : "Create an account"}
           </Link>
         </p>

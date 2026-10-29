@@ -34,10 +34,10 @@ export default function Accounts({
 
   return (
     <div className="mx-auto max-w-4xl">
-      <h1 className="text-xl font-semibold">Accounts</h1>
-      <p className="mb-6 text-sm text-zinc-500">Connect the profiles, pages and channels you want to post to.</p>
+      <h1 className="font-display text-3xl">Accounts</h1>
+      <p className="mb-6 text-sm text-ink/50">Connect the profiles, pages and channels you want to post to.</p>
 
-      {error && <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       {accounts.length > 0 && (
         <section className="mb-8">
@@ -48,25 +48,25 @@ export default function Accounts({
                 <Avatar account={a} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{a.name}</div>
-                  <div className="truncate text-xs text-zinc-500">
+                  <div className="truncate text-xs text-ink/50">
                     {a.providerName}
                     {a.username ? ` · ${a.username}` : ""}
                   </div>
                   {a.status !== "active" && (
-                    <div className="mt-1 text-xs text-amber-300" title={a.lastError ?? undefined}>
+                    <div className="mt-1 text-xs text-amber-700" title={a.lastError ?? undefined}>
                       Needs attention — reconnect
                     </div>
                   )}
                   {a.expiresAt && a.expiresAt < Date.now() + 7 * 86400_000 && a.provider === "linkedin" && (
-                    <div className="mt-1 text-xs text-amber-300">Token expires soon — reconnect</div>
+                    <div className="mt-1 text-xs text-amber-700">Token expires soon — reconnect</div>
                   )}
                 </div>
                 {a.profileUrl && (
-                  <a href={a.profileUrl} target="_blank" rel="noreferrer" className="text-xs text-zinc-400 hover:text-white">
+                  <a href={a.profileUrl} target="_blank" rel="noreferrer" className="text-xs text-ink/60 hover:text-white">
                     ↗
                   </a>
                 )}
-                <button className="text-xs text-zinc-500 hover:text-red-300" onClick={() => disconnect(a)}>
+                <button className="text-xs text-ink/50 hover:text-red-700" onClick={() => disconnect(a)}>
                   Remove
                 </button>
               </li>
@@ -83,13 +83,13 @@ export default function Accounts({
               key={p.id}
               onClick={() => start(p)}
               disabled={!p.configured}
-              className="card flex flex-col items-start gap-3 p-4 text-left transition enabled:hover:border-white/25 disabled:opacity-50"
+              className="card flex flex-col items-start gap-3 p-4 text-left transition enabled:hover:border-ink/30 disabled:opacity-50"
               title={p.configured ? undefined : p.setupHint}
             >
               <ProviderIcon provider={p.id} size={32} />
               <div>
                 <div className="text-sm font-medium">{p.name}</div>
-                <div className="text-xs text-zinc-500">
+                <div className="text-xs text-ink/50">
                   {p.configured ? (p.connect === "oauth" ? "Sign in to connect" : "Connect with a key") : "Server setup needed"}
                 </div>
               </div>
@@ -97,7 +97,7 @@ export default function Accounts({
           ))}
         </div>
         {providers.some((p) => !p.configured) && (
-          <p className="mt-4 text-xs text-zinc-500">
+          <p className="mt-4 text-xs text-ink/50">
             Greyed-out platforms need API app credentials in the server&apos;s <code>.env</code> — see the README.
           </p>
         )}
@@ -155,10 +155,10 @@ function ConnectForm({ provider, onClose, onDone }: { provider: ProviderInfo; on
               required={f.required}
               autoComplete="off"
             />
-            {f.help && <p className="mt-1 text-xs text-zinc-500">{f.help}</p>}
+            {f.help && <p className="mt-1 text-xs text-ink/50">{f.help}</p>}
           </div>
         ))}
-        {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm break-words text-red-300">{error}</p>}
+        {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm break-words text-red-700">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn-primary" disabled={busy}>

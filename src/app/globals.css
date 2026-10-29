@@ -1,21 +1,32 @@
 @import "tailwindcss";
 
+/* PostGoblins brand: goblin lime + charcoal ink, sticker-style black outlines (see public/brand). */
 @theme {
-  --color-goblin-300: #9ef0b5;
-  --color-goblin-400: #5fdc85;
-  --color-goblin-500: #34c463;
-  --color-goblin-600: #24a14e;
-  --color-goblin-700: #1d7f3f;
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-goblin-50: #f5fce8;
+  --color-goblin-100: #e9f8cc;
+  --color-goblin-200: #d3f19a;
+  --color-goblin-300: #b8e85f;
+  --color-goblin-400: #a2e03a;
+  --color-goblin-500: #8fd624; /* brand lime */
+  --color-goblin-600: #74b316;
+  --color-goblin-700: #578a0f;
+  --color-goblin-800: #436a10;
+  --color-goblin-900: #375712;
+
+  --color-ink: #1d1e23; /* brand charcoal */
+  --color-paper: #f4f7ee; /* page background */
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-lilita), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background: #0b0d0c;
-  color: #e7ebe8;
+  background: var(--color-paper);
+  color: var(--color-ink);
 }
 
 ::-webkit-scrollbar {
@@ -23,29 +34,34 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2f2c;
+  background: #cfd5c4;
   border-radius: 8px;
-  border: 2px solid #0b0d0c;
+  border: 2px solid var(--color-paper);
 }
 
 @utility card {
-  @apply rounded-xl border border-white/8 bg-[#121513];
+  @apply rounded-xl border border-ink/10 bg-white shadow-[0_1px_2px_rgba(29,30,35,0.06)];
 }
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
 }
+/* Lime "sticker" button: black outline + hard shadow, like the logo. */
 @utility btn-primary {
-  @apply btn bg-goblin-500 text-black hover:bg-goblin-400;
+  @apply btn border-2 border-ink bg-goblin-500 text-ink shadow-[2px_2px_0_var(--color-ink)] hover:bg-goblin-400 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--color-ink)];
 }
 @utility btn-ghost {
-  @apply btn border border-white/10 bg-white/[0.03] text-zinc-200 hover:bg-white/[0.07];
+  @apply btn border border-ink/15 bg-white text-ink hover:border-ink/30 hover:bg-goblin-50;
 }
 @utility btn-danger {
-  @apply btn border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20;
+  @apply btn border border-red-600/30 bg-red-50 text-red-700 hover:bg-red-100;
 }
 @utility input {
-  @apply w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-goblin-500/60 focus:ring-2 focus:ring-goblin-500/20;
+  @apply w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink/40 focus:border-goblin-600 focus:ring-2 focus:ring-goblin-500/30;
 }
 @utility label {
-  @apply mb-1 block text-xs font-medium tracking-wide text-zinc-400 uppercase;
+  @apply mb-1 block text-xs font-semibold tracking-wide text-ink/60 uppercase;
+}
+@utility font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
 }

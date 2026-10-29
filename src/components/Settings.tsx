@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ThemeToggle } from "./Theme";
 import { request } from "./ui";
 
 type Key = { id: string; name: string; prefix: string; createdAt: number; lastUsedAt: number | null };
@@ -91,6 +92,14 @@ export default function Settings({ timezone, onTimezoneSaved }: { timezone: stri
         {error && <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700">{error}</p>}
       </div>
 
+      <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <h2 className="font-semibold">Appearance</h2>
+          <p className="text-sm text-ink/60">Light, dark, or follow your device. Saved in this browser.</p>
+        </div>
+        <ThemeToggle />
+      </section>
+
       <section className="card space-y-3 p-5">
         <h2 className="font-semibold">Timezone</h2>
         <p className="text-sm text-ink/60">
@@ -115,7 +124,7 @@ export default function Settings({ timezone, onTimezoneSaved }: { timezone: stri
           </p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg border border-ink/10 bg-white px-3 py-2">
+        <div className="flex items-center gap-2 rounded-lg border border-ink/10 bg-surface px-3 py-2">
           <span className="text-xs text-ink/50">Endpoint</span>
           <code className="flex-1 truncate text-sm text-goblin-800">{mcpUrl}</code>
           <Copy text={mcpUrl} />

@@ -319,7 +319,7 @@ export default function Composer({
 
           <div>
             <div className="label">Preview</div>
-            <div className="rounded-xl border border-ink/15 bg-white p-4">
+            <div className="rounded-xl border border-ink/15 bg-surface p-4">
               <div className="mb-3 flex items-center gap-2.5">
                 {previewAccount ? (
                   <Avatar account={previewAccount} size={36} />

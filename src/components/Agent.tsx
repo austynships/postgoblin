@@ -209,7 +209,7 @@ export default function Agent({
                   className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                     it.kind === "user"
                       ? "rounded-br-sm bg-goblin-500/20 whitespace-pre-wrap text-ink"
-                      : "rounded-bl-sm border border-ink/10 bg-white text-ink"
+                      : "rounded-bl-sm border border-ink/10 bg-surface text-ink"
                   }`}
                 >
                   {it.kind === "user" ? it.text : <Rich text={it.text} />}

@@ -7,6 +7,7 @@ import Calendar from "./Calendar";
 import Composer, { type ComposerSeed } from "./Composer";
 import PostsList from "./PostsList";
 import Settings from "./Settings";
+import { ThemeToggle } from "./Theme";
 import { GoblinIcon, Logo, request, type AccountView, type ProviderInfo } from "./ui";
 
 type Tab = "calendar" | "posts" | "agent" | "accounts" | "settings";
@@ -85,7 +86,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex shrink-0 flex-row items-center gap-1 border-b border-ink/10 bg-white p-2 md:w-56 md:flex-col md:items-stretch md:border-r md:border-b-0 md:p-4">
+      <aside className="flex shrink-0 flex-row items-center gap-1 border-b border-ink/10 bg-surface p-2 md:w-56 md:flex-col md:items-stretch md:border-r md:border-b-0 md:p-4">
         <div className="mr-2 flex items-center px-1 md:mr-0 md:mb-6">
           <GoblinIcon size={36} className="md:hidden" />
           <Logo height={54} className="hidden max-w-full md:block" />
@@ -114,9 +115,12 @@ export default function Dashboard() {
           <div className="hidden border-t border-ink/10 pt-4 md:block">
             <div className="truncate text-sm font-medium">{me.user.name}</div>
             <div className="truncate text-xs text-ink/50">{me.user.email}</div>
-            <button className="mt-2 text-xs text-ink/60 hover:text-ink" onClick={logout}>
-              Sign out
-            </button>
+            <div className="mt-3 flex items-center justify-between">
+              <button className="text-xs text-ink/60 hover:text-ink" onClick={logout}>
+                Sign out
+              </button>
+              <ThemeToggle />
+            </div>
           </div>
         )}
       </aside>

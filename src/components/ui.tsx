@@ -76,7 +76,7 @@ export function Avatar({ account, size = 36 }: { account: { avatar: string | nul
           {account.name.slice(0, 1).toUpperCase()}
         </span>
       )}
-      <span className="absolute -right-1 -bottom-1 rounded-full ring-2 ring-white">
+      <span className="absolute -right-1 -bottom-1 rounded-full ring-2 ring-surface">
         <ProviderIcon provider={account.provider} size={Math.max(14, size * 0.42)} />
       </span>
     </span>
@@ -105,7 +105,7 @@ export function StatusPill({ status }: { status: string }) {
 export function Modal({ children, onClose, wide }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/50 p-4 backdrop-blur-sm sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:p-8"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className={`card w-full ${wide ? "max-w-5xl" : "max-w-lg"} shadow-2xl`}>{children}</div>
@@ -121,18 +121,19 @@ export function GoblinIcon({ size = 24, className = "" }: { size?: number; class
   );
 }
 
-/** Full PostGoblins wordmark (public/brand/logo.png, 720×234). */
+/**
+ * Full PostGoblins wordmark (720×234). Dark mode uses the reversed version
+ * (logo-dark.png, light "Post" lettering) so the wordmark stays legible.
+ */
 export function Logo({ height = 40, className = "" }: { height?: number; className?: string }) {
+  const size = { height, width: Math.round((height * 720) / 234) };
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/brand/logo.png"
-      alt="PostGoblins"
-      height={height}
-      width={Math.round((height * 720) / 234)}
-      className={className}
-      style={{ height, width: "auto" }}
-    />
+    <span className={className}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/logo.png" alt="PostGoblins" {...size} className="block max-w-full dark:hidden" style={{ height, width: "auto" }} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/logo-dark.png" alt="PostGoblins" {...size} className="hidden max-w-full dark:block" style={{ height, width: "auto" }} />
+    </span>
   );
 }
 

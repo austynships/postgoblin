@@ -201,7 +201,7 @@ function PostCard({ post, onClick }: { post: PostView; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="w-full rounded-lg border border-ink/10 bg-white p-2 text-left transition hover:border-ink/30"
+      className="w-full rounded-lg border border-ink/10 bg-surface p-2 text-left transition hover:border-ink/30"
     >
       <div className="mb-1.5 flex items-center justify-between gap-1">
         <span className="text-xs text-ink/60">{fmtTime(postTime(post))}</span>

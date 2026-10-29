@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Dark mode is class-based: <html class="dark"> (set by ThemeScript / ThemeToggle). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* PostGoblins brand: goblin lime + charcoal ink, sticker-style black outlines (see public/brand). */
 @theme {
   --color-goblin-50: #f5fce8;
@@ -13,8 +16,10 @@
   --color-goblin-800: #436a10;
   --color-goblin-900: #375712;
 
-  --color-ink: #1d1e23; /* brand charcoal */
+  --color-ink: #1d1e23; /* brand charcoal: text and hairlines */
   --color-paper: #f4f7ee; /* page background */
+  --color-surface: #ffffff; /* cards, inputs, sidebar */
+  --color-outline: #1d1e23; /* sticker outlines on primary buttons */
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-lilita), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -22,6 +27,33 @@
 
 :root {
   color-scheme: light;
+}
+
+/*
+ * Dark theme: the same brand, re-tuned for a charcoal background.
+ * Tints flip to deep greens and the "-700/-800" text shades flip to light
+ * ones, so components keep a single set of classes for both themes.
+ */
+.dark {
+  color-scheme: dark;
+  --color-ink: #e8ebe3;
+  --color-paper: #0f1012;
+  --color-surface: #18191d;
+  --color-outline: #000000;
+
+  --color-goblin-50: #161d0c;
+  --color-goblin-100: #1f2a10;
+  --color-goblin-200: #2d3f13;
+  --color-goblin-700: #a2e03a;
+  --color-goblin-800: #b8e85f;
+
+  --color-red-50: #2a1416;
+  --color-red-100: #3a1a1d;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-amber-700: #fcd34d;
+  --color-sky-700: #7dd3fc;
+  --color-orange-700: #fdba74;
 }
 
 body {
@@ -34,29 +66,29 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cfd5c4;
+  background: color-mix(in srgb, var(--color-ink) 22%, transparent);
   border-radius: 8px;
   border: 2px solid var(--color-paper);
 }
 
 @utility card {
-  @apply rounded-xl border border-ink/10 bg-white shadow-[0_1px_2px_rgba(29,30,35,0.06)];
+  @apply rounded-xl border border-ink/10 bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.06)];
 }
 @utility btn {
   @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
 }
-/* Lime "sticker" button: black outline + hard shadow, like the logo. */
+/* Lime "sticker" button: black outline + hard shadow, like the logo. Text stays charcoal in both themes. */
 @utility btn-primary {
-  @apply btn border-2 border-ink bg-goblin-500 text-ink shadow-[2px_2px_0_var(--color-ink)] hover:bg-goblin-400 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--color-ink)];
+  @apply btn border-2 border-outline bg-goblin-500 text-[#1d1e23] shadow-[2px_2px_0_var(--color-outline)] hover:bg-goblin-400 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--color-outline)];
 }
 @utility btn-ghost {
-  @apply btn border border-ink/15 bg-white text-ink hover:border-ink/30 hover:bg-goblin-50;
+  @apply btn border border-ink/15 bg-surface text-ink hover:border-ink/30 hover:bg-goblin-50;
 }
 @utility btn-danger {
   @apply btn border border-red-600/30 bg-red-50 text-red-700 hover:bg-red-100;
 }
 @utility input {
-  @apply w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink/40 focus:border-goblin-600 focus:ring-2 focus:ring-goblin-500/30;
+  @apply w-full rounded-lg border border-ink/15 bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink/40 focus:border-goblin-600 focus:ring-2 focus:ring-goblin-500/30;
 }
 @utility label {
   @apply mb-1 block text-xs font-semibold tracking-wide text-ink/60 uppercase;

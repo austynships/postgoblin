@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ThemeToggle } from "./Theme";
 import { Logo, request } from "./ui";
 
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
@@ -27,7 +28,8 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center px-4">
+    <main className="relative grid min-h-screen place-items-center px-4">
+      <ThemeToggle className="absolute top-4 right-4" />
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           <h1 className="sr-only">PostGoblins</h1>

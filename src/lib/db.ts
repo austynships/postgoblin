@@ -11,13 +11,43 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
 let client: NeonQueryFunction<false, false> | null = null;
 
-function sql() {
-  if (!client) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not set. See .env.example.");
-    client = neon(url);
+/**
+ * Tolerates common copy-paste mistakes in hosting dashboards: surrounding
+ * quotes or whitespace, a pasted `DATABASE_URL=` prefix, or a `psql '…'` wrapper.
+ */
+export function databaseUrl() {
+  let raw = (process.env.DATABASE_URL ?? "").trim();
+  raw = raw.replace(/^DATABASE_URL\s*=\s*/i, "").replace(/^psql\s+/i, "").trim();
+  raw = raw.replace(/^['"]|['"]$/g, "").trim();
+  if (!raw) throw new Error("DATABASE_URL is not set. See .env.example.");
+  if (!/^postgres(ql)?:\/\//.test(raw)) {
+    throw new Error("DATABASE_URL must start with postgresql:// — check the value in your hosting settings.");
   }
+  return raw;
+}
+
+/** Host of the configured database (no credentials), for diagnostics. */
+export function databaseHost() {
+  try {
+    return new URL(databaseUrl()).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function sql() {
+  if (!client) client = neon(databaseUrl());
   return client;
+}
+
+/** Turns the driver's bare "fetch failed" into something actionable. */
+function explain(err: unknown): never {
+  const e = err as Error & { cause?: { code?: string; message?: string } };
+  if (/fetch failed/i.test(e?.message ?? "")) {
+    const reason = e.cause?.code ?? e.cause?.message ?? "network error";
+    throw new Error(`Can't reach the database at ${databaseHost() ?? "(unknown host)"} (${reason}). Check DATABASE_URL.`);
+  }
+  throw err;
 }
 
 function toPg(text: string) {
@@ -38,7 +68,11 @@ function normalize<T>(rows: Record<string, unknown>[]): T[] {
 }
 
 export async function all<T = Record<string, any>>(text: string, params: unknown[] = []): Promise<T[]> {
-  return normalize<T>((await sql().query(toPg(text), params)) as Record<string, unknown>[]);
+  try {
+    return normalize<T>((await sql().query(toPg(text), params)) as Record<string, unknown>[]);
+  } catch (err) {
+    explain(err);
+  }
 }
 
 export async function one<T = Record<string, any>>(text: string, params: unknown[] = []): Promise<T | undefined> {
@@ -46,14 +80,22 @@ export async function one<T = Record<string, any>>(text: string, params: unknown
 }
 
 export async function run(text: string, params: unknown[] = []): Promise<void> {
-  await sql().query(toPg(text), params);
+  try {
+    await sql().query(toPg(text), params);
+  } catch (err) {
+    explain(err);
+  }
 }
 
 /** Runs statements atomically in one non-interactive transaction. */
 export async function tx(statements: [string, unknown[]][]): Promise<void> {
   if (!statements.length) return;
   const q = sql();
-  await q.transaction(statements.map(([text, params]) => q.query(toPg(text), params)));
+  try {
+    await q.transaction(statements.map(([text, params]) => q.query(toPg(text), params)));
+  } catch (err) {
+    explain(err);
+  }
 }
 
 export function now() {

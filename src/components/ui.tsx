@@ -45,7 +45,7 @@ export function ProviderIcon({ provider, size = 18 }: { provider: string; size?:
   const color = PROVIDER_COLORS[provider] ?? "#888";
   return (
     <span
-      className="inline-grid shrink-0 place-items-center rounded-full font-bold leading-none"
+      className="inline-grid shrink-0 place-items-center rounded-full font-bold leading-none ring-1 ring-ink/10"
       style={{
         width: size,
         height: size,

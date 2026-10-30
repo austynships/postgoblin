@@ -121,6 +121,10 @@ export default function Dashboard() {
               </button>
               <ThemeToggle />
             </div>
+            <div className="mt-3 flex gap-3 text-[11px] text-ink/40">
+              <a className="hover:text-ink" href="/privacy" target="_blank">Privacy</a>
+              <a className="hover:text-ink" href="/terms" target="_blank">Terms</a>
+            </div>
           </div>
         )}
       </aside>

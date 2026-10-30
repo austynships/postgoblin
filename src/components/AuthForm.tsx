@@ -63,12 +63,30 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <button className="btn-primary w-full" disabled={busy}>
             {busy ? "…" : signup ? "Create account" : "Sign in"}
           </button>
+          {signup && (
+            <p className="text-center text-xs text-ink/50">
+              By creating an account you agree to the{" "}
+              <Link className="text-goblin-800 hover:underline" href="/terms" target="_blank">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link className="text-goblin-800 hover:underline" href="/privacy" target="_blank">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          )}
         </form>
         <p className="mt-4 text-center text-sm text-ink/60">
           {signup ? "Already have an account? " : "New here? "}
           <Link className="text-goblin-800 hover:underline" href={signup ? "/login" : "/signup"}>
             {signup ? "Sign in" : "Create an account"}
           </Link>
+        </p>
+        <p className="mt-6 text-center text-xs text-ink/40">
+          <Link className="hover:text-ink" href="/privacy">Privacy</Link>
+          <span className="mx-2">·</span>
+          <Link className="hover:text-ink" href="/terms">Terms</Link>
         </p>
       </div>
     </main>

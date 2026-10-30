@@ -47,11 +47,18 @@ export default function TermsPage() {
 
       <Section id="platforms" title="3. Third-party platforms">
         <p>
-          When you connect a platform such as Facebook, Threads, X, LinkedIn, Bluesky, Mastodon, Discord or Telegram,
+          When you connect a platform such as Facebook, Instagram, Threads, YouTube, TikTok, X, LinkedIn, Bluesky, Mastodon, Discord or Telegram,
           your use of it remains subject to that platform’s own terms and policies. You authorise us to access those
           accounts and publish to them on your behalf, within the permissions you grant. You can revoke access at any
           time. Some platforms charge for API access (for example, X charges per post); you are responsible for any
           such costs unless we tell you otherwise.
+        </p>
+        <p>
+          PostGoblins uses YouTube API Services. By connecting a YouTube channel you agree to be bound by the{" "}
+          <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">YouTube Terms of Service</a>.
+          Instagram, YouTube and TikTok posts must include the media those platforms require (a photo or video for
+          Instagram, one video for YouTube and TikTok), and new apps may be limited to private posts until the platform
+          approves them.
         </p>
       </Section>
 

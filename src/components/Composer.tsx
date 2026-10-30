@@ -18,6 +18,8 @@ export default function Composer({
   accounts,
   providers,
   aiEnabled,
+  directUploads,
+  userId,
   onClose,
   onSaved,
   onGoToAccounts,
@@ -26,6 +28,8 @@ export default function Composer({
   accounts: AccountView[];
   providers: ProviderInfo[];
   aiEnabled: boolean;
+  directUploads: boolean;
+  userId: string;
   onClose: () => void;
   onSaved: (message: string) => void;
   onGoToAccounts: () => void;
@@ -48,32 +52,73 @@ export default function Composer({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
+  const [progress, setProgress] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const chosen = accounts.filter((a) => selected.includes(a.id));
   const platforms = [...new Set(chosen.map((a) => a.provider))];
   const counts = platforms.map((p) => ({ p, n: countChars(p, content), max: CHAR_LIMITS[p] }));
   const tooLong = counts.some((c) => c.n > c.max);
-  const maxMedia = Math.min(...platforms.map((p) => providers.find((x) => x.id === p)?.maxMedia ?? 4), 10);
+  // The most restrictive limit among selected platforms (10 when none are selected).
+  const maxMedia = Math.min(10, ...platforms.map((p) => providers.find((x) => x.id === p)?.maxMedia ?? 10));
   const providerName = (id: string) => providers.find((p) => p.id === id)?.name ?? id;
 
+  // Platform media rules: Instagram needs media; YouTube and TikTok need exactly one video.
+  const videos = media.filter((m) => m.mime.startsWith("video/")).length;
+  const mediaProblems = platforms.flatMap((p) => {
+    const info = providers.find((x) => x.id === p);
+    if (!info) return [];
+    if (info.requiresMedia === "any" && media.length === 0) return [`${info.name} needs a photo or video`];
+    if (info.requiresMedia === "video" && !(media.length === 1 && videos === 1)) return [`${info.name} needs exactly one video`];
+    if (media.length > info.maxMedia) return [`${info.name} allows at most ${info.maxMedia} file${info.maxMedia > 1 ? "s" : ""}`];
+    return [];
+  });
+  const blocked = tooLong || mediaProblems.length > 0;
+
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  /**
+   * With Blob storage, files go straight from the browser to storage (needed
+   * for video: serverless functions only accept ~4.5MB). Otherwise they're
+   * posted to our own upload route.
+   */
+  async function uploadOne(file: File): Promise<Media> {
+    if (directUploads) {
+      const { upload: blobUpload } = await import("@vercel/blob/client");
+      const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(-80) || "upload";
+      const blob = await blobUpload(`media/u/${userId}/${safeName}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/media/blob",
+        contentType: file.type,
+        multipart: file.size > 20 * 1024 * 1024,
+        onUploadProgress: ({ percentage }) => setProgress(Math.round(percentage)),
+      });
+      const { media: m } = await request<{ media: Media }>("/api/media/register", {
+        method: "POST",
+        body: { url: blob.url, pathname: blob.pathname, name: file.name },
+      });
+      return m;
+    }
+    const body = new FormData();
+    body.append("file", file);
+    return (await request<{ media: Media }>("/api/media", { method: "POST", body })).media;
+  }
 
   async function upload(files: FileList | null) {
     if (!files) return;
     setError("");
+    setBusy("upload");
     for (const file of Array.from(files)) {
-      const body = new FormData();
-      body.append("file", file);
-      setBusy("upload");
+      setProgress(0);
       try {
-        const { media: m } = await request<{ media: Media }>("/api/media", { method: "POST", body });
+        const m = await uploadOne(file);
         setMedia((cur) => [...cur, m]);
       } catch (err) {
-        setError((err as Error).message);
+        setError(`${file.name}: ${(err as Error).message}`);
       }
     }
     setBusy(null);
+    setProgress(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -269,7 +314,7 @@ export default function Composer({
                   disabled={busy === "upload"}
                   className="grid h-20 w-20 place-items-center rounded-lg border border-dashed border-ink/20 text-xs text-ink/60 hover:border-ink/30"
                 >
-                  {busy === "upload" ? "…" : "+ Add"}
+                  {busy === "upload" ? (progress !== null && progress > 0 ? `${progress}%` : "…") : "+ Add"}
                 </button>
               )}
               <input
@@ -277,7 +322,7 @@ export default function Composer({
                 type="file"
                 hidden
                 multiple
-                accept="image/jpeg,image/png,image/gif,image/webp,video/mp4"
+                accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
                 onChange={(e) => upload(e.target.files)}
               />
             </div>
@@ -358,12 +403,17 @@ export default function Composer({
               deselect those accounts.
             </p>
           )}
+          {!locked && mediaProblems.length > 0 && (
+            <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
+              {mediaProblems.join(". ")}. Adjust the media or deselect those accounts.
+            </p>
+          )}
 
           {!locked && (
             <div className="space-y-2">
               <button
                 className="btn-primary w-full"
-                disabled={!!busy || tooLong || !selected.length || (!content.trim() && !media.length)}
+                disabled={!!busy || blocked || !selected.length || (!content.trim() && !media.length)}
                 onClick={() => save("schedule")}
               >
                 {busy === "schedule" ? "Scheduling…" : post?.status === "scheduled" ? "Update schedule" : "Schedule"}
@@ -371,7 +421,7 @@ export default function Composer({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   className="btn-ghost"
-                  disabled={!!busy || tooLong || !selected.length || (!content.trim() && !media.length)}
+                  disabled={!!busy || blocked || !selected.length || (!content.trim() && !media.length)}
                   onClick={() => confirm("Publish to the selected accounts right now?") && save("now")}
                 >
                   {busy === "now" ? "Posting…" : "Post now"}

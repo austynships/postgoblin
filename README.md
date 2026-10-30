@@ -13,7 +13,7 @@ publish posts — by hand, with an AI agent, or from any external AI agent over 
 - **MCP server** at `/api/mcp` so Claude Code, Claude Desktop, Cursor or your own agents can drive PostGoblins
 - **Background scheduler** with atomic claiming (no double posts), per-account delivery status, automatic retries with
   backoff (1 min, 4 min), token refresh, and crash recovery
-- **Integrations**: X, Bluesky, Mastodon, LinkedIn, Threads, Facebook Pages, Discord, Telegram
+- **Integrations**: X, Bluesky, Mastodon, LinkedIn, Threads, Facebook Pages, Instagram, YouTube, TikTok, Discord, Telegram
 - Multi-user email/password auth; social tokens are **encrypted at rest** (AES-256-GCM)
 
 ## Quick start
@@ -68,6 +68,9 @@ Locally, an in-process scheduler publishes due posts every `SCHEDULER_INTERVAL` 
 | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | LinkedIn app with *OpenID Connect* + *Share on LinkedIn*; `LINKEDIN_VERSION` sets the API version header |
 | `THREADS_APP_ID` / `THREADS_APP_SECRET` | Meta app with the Threads use case |
 | `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET` | Meta app with `pages_manage_posts`, `pages_show_list` |
+| `INSTAGRAM_CONFIG_ID` | Instagram (via Facebook Login): login configuration on the same Meta app with `instagram_basic` + `instagram_content_publish`. Needs a Business/Creator account linked to a Facebook Page, and Blob storage (Instagram fetches media by URL) |
+| `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` | Google Cloud OAuth client (Web application) with YouTube Data API v3 enabled. Uploads stay private until Google verifies the app |
+| `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | TikTok developer app with Login Kit + Content Posting API. Posts are "only me" until TikTok audits the app |
 | `FACEBOOK_CONFIG_ID` | Required for Meta business apps using *Facebook Login for Business*: the login configuration ID (Facebook Login for Business → Configurations) |
 | `SCHEDULER_INTERVAL` | Seconds between scheduler ticks (default 20) |
 

@@ -8,7 +8,7 @@ import { ProviderError } from "./providers/types";
 const MAX_ATTEMPTS = 3;
 const REFRESH_WINDOW = 7 * 24 * 60 * 60 * 1000;
 /** A target stuck in 'sending' this long (crashed or timed-out function) goes back in the queue. */
-const STALE_CLAIM = 5 * 60 * 1000;
+const STALE_CLAIM = 10 * 60 * 1000; // longer than the 300s function limit, so live uploads are never re-queued
 
 type DueTarget = { id: string; post_id: string; account_id: string; attempts: number };
 

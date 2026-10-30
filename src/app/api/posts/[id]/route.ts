@@ -4,6 +4,9 @@ import { publishSoon } from "@/lib/scheduler";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+// "Post now" publishes after the response (video uploads can take minutes).
+export const maxDuration = 300;
+
 export const GET = handler(async (_req: Request, { params }: Ctx) => {
   const user = await requireUser();
   return Response.json({ post: await getPost(user.id, (await params).id) });

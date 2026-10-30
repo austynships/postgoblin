@@ -11,7 +11,12 @@ import { ThemeToggle } from "./Theme";
 import { GoblinIcon, Logo, request, type AccountView, type ProviderInfo } from "./ui";
 
 type Tab = "calendar" | "posts" | "agent" | "accounts" | "settings";
-type Me = { user: { name: string; email: string; timezone: string }; providers: ProviderInfo[]; aiEnabled: boolean };
+type Me = {
+  user: { id: string; name: string; email: string; timezone: string };
+  providers: ProviderInfo[];
+  aiEnabled: boolean;
+  directUploads: boolean;
+};
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 const NAV_ICONS: Record<Exclude<Tab, "agent">, React.ReactNode> = {
@@ -171,6 +176,8 @@ export default function Dashboard() {
           accounts={accounts}
           providers={me.providers}
           aiEnabled={me.aiEnabled}
+          directUploads={me.directUploads}
+          userId={me.user.id}
           onClose={() => setComposer(null)}
           onSaved={(msg) => {
             setComposer(null);

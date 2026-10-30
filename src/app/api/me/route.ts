@@ -1,12 +1,18 @@
 import { aiEnabled } from "@/lib/agent";
 import { HttpError, handler, requireUser } from "@/lib/auth";
 import { run } from "@/lib/db";
+import { directUploadsEnabled } from "@/lib/media";
 import { providerCatalog } from "@/lib/providers";
 import { validTimeZone } from "@/lib/time";
 
 export const GET = handler(async () => {
   const user = await requireUser();
-  return Response.json({ user, providers: providerCatalog(), aiEnabled: aiEnabled() });
+  return Response.json({
+    user,
+    providers: providerCatalog(),
+    aiEnabled: aiEnabled(),
+    directUploads: directUploadsEnabled(),
+  });
 });
 
 export const PATCH = handler(async (req: Request) => {

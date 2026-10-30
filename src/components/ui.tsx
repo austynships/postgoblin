@@ -26,6 +26,9 @@ const SHORT: Record<string, string> = {
   linkedin: "in",
   threads: "@",
   facebook: "f",
+  instagram: "ig",
+  youtube: "▶",
+  tiktok: "♪",
   discord: "D",
   telegram: "✈",
 };
@@ -37,6 +40,9 @@ export const PROVIDER_COLORS: Record<string, string> = {
   linkedin: "#0a66c2",
   threads: "#000000",
   facebook: "#0866ff",
+  instagram: "#e1306c",
+  youtube: "#ff0000",
+  tiktok: "#000000",
   discord: "#5865f2",
   telegram: "#229ed9",
 };

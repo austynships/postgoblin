@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           salted, one-way hash of your password, never the password itself.
         </p>
         <p>
-          <strong>Connected social accounts.</strong> When you connect a platform (for example Facebook Pages, Threads,
+          <strong>Connected social accounts.</strong> When you connect a platform (for example Facebook Pages, Instagram, Threads, YouTube, TikTok,
           X, LinkedIn, Bluesky, Mastodon, Discord or Telegram) we receive and store what is needed to post on your
           behalf: the account or page ID, display name, username, profile picture link, and the access credentials the
           platform issues (OAuth tokens, or an app password, webhook URL or bot token you provide). These credentials
@@ -88,17 +88,35 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section id="meta" title="4. Data from Facebook and Threads">
+      <Section id="meta" title="4. Data from Facebook, Instagram, Threads, YouTube and TikTok">
         <p>
-          If you connect a Facebook Page or Threads profile, we use the permissions you grant (such as listing the Pages
-          you manage and publishing posts) only to publish the content you schedule and show its status. We do not use
-          this data for advertising, profiling or any other purpose, and we do not share it except as described above.
+          If you connect a Facebook Page, Instagram professional account or Threads profile, we use the permissions you
+          grant (such as listing the Pages you manage and publishing posts) only to publish the content you schedule and
+          show its status. We do not use this data for advertising, profiling or any other purpose, and we do not share
+          it except as described above. You can remove our access at any time by disconnecting the account in
+          PostGoblins, or from Facebook (Settings → Business integrations, which also covers Instagram accounts connected
+          through Facebook) or Threads (Settings → Account → Website permissions).
         </p>
         <p>
-          You can remove our access at any time by disconnecting the account in PostGoblins, or from Facebook (Settings
-          → Business integrations) or Threads (Settings → Account → Website permissions). To have all data we received
-          from Meta deleted, follow the steps in section 7.
+          <strong>YouTube.</strong> PostGoblins uses YouTube API Services to upload the videos you schedule to your
+          channel and to read your channel’s name and picture. By connecting YouTube you agree to the{" "}
+          <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">YouTube Terms of Service</a>, and
+          Google’s handling of your data is described in the{" "}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Google Privacy Policy</a>. You
+          can revoke our access at any time on your{" "}
+          <a href="https://myaccount.google.com/connections" target="_blank" rel="noreferrer">
+            Google Account’s third-party connections page
+          </a>
+
+          . After that we can no longer access your channel; disconnect YouTube in PostGoblins to also delete the
+          stored credentials immediately.
         </p>
+        <p>
+          <strong>TikTok.</strong> We use TikTok’s APIs only to read your display name and avatar and to upload the
+          videos you schedule. You can revoke access from TikTok (Settings and privacy → Security → Manage app
+          permissions) or by disconnecting TikTok in PostGoblins.
+        </p>
+        <p>To have all data we received from any of these platforms deleted, follow the steps in section 7.</p>
       </Section>
 
       <Section id="cookies" title="5. Cookies and local storage">

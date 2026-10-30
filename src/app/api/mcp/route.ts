@@ -12,9 +12,9 @@ export const maxDuration = 300;
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
 const SERVER_INFO = { name: "postgoblins", title: "PostGoblins", version: "0.1.0" };
 const INSTRUCTIONS =
-  "PostGoblins schedules posts to the user's own connected social accounts (X, Bluesky, Mastodon, LinkedIn, Threads, Facebook Pages, Discord, Telegram). " +
+  "PostGoblins schedules posts to the user's own connected social accounts (X, Bluesky, Mastodon, LinkedIn, Threads, Facebook Pages, Instagram, YouTube, TikTok, Discord, Telegram). " +
   "Call get_current_time and list_accounts first. Always pass scheduled_at as ISO-8601 with an explicit UTC offset. " +
-  "Respect each platform's character limit (returned by list_accounts). Only use mode 'now' or delete_post when the user explicitly asked for that.";
+  "Respect each platform's character limit (returned by list_accounts). Instagram needs at least one photo or video; YouTube and TikTok need exactly one video (use list_media for ids). Only use mode 'now' or delete_post when the user explicitly asked for that.";
 
 const READ_ONLY = new Set(["get_current_time", "list_accounts", "list_posts", "get_post", "find_open_slots", "list_media"]);
 const TITLES: Record<string, string> = {

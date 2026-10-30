@@ -143,14 +143,17 @@ async function validate(userId: string, input: PostInput) {
     if (n > CHAR_LIMITS[a.provider]) {
       problems.push(`${p.name} (${a.name}): ${n}/${CHAR_LIMITS[a.provider]} characters`);
     }
-    if (media.length > p.maxMedia) problems.push(`${p.name}: at most ${p.maxMedia} media files`);
+    if (media.length > p.maxMedia) problems.push(`${p.name}: at most ${p.maxMedia} media file${p.maxMedia > 1 ? "s" : ""}`);
+    const videos = media.filter((m) => m.mime.startsWith("video/")).length;
+    if (p.requiresMedia === "any" && media.length === 0) problems.push(`${p.name} needs at least one photo or video`);
+    if (p.requiresMedia === "video" && (videos !== 1 || media.length !== 1)) problems.push(`${p.name} needs exactly one video`);
   }
   if (input.mode === "schedule") {
     if (!input.scheduledAt || Number.isNaN(input.scheduledAt)) throw new HttpError(400, "Pick a date and time");
     if (input.scheduledAt < now() - 60_000) throw new HttpError(400, "Scheduled time is in the past");
   }
   if (problems.length && input.mode !== "draft") {
-    throw new HttpError(400, `Too long for some platforms — ${problems.join("; ")}`);
+    throw new HttpError(400, `Can't post to some platforms — ${problems.join("; ")}`);
   }
   return { content, mediaIds };
 }

@@ -9,6 +9,9 @@ const PLATFORMS = [
   { id: "linkedin", name: "LinkedIn" },
   { id: "threads", name: "Threads" },
   { id: "facebook", name: "Facebook Pages" },
+  { id: "instagram", name: "Instagram" },
+  { id: "youtube", name: "YouTube" },
+  { id: "tiktok", name: "TikTok" },
   { id: "discord", name: "Discord" },
   { id: "telegram", name: "Telegram" },
 ];
@@ -89,7 +92,7 @@ const FAQ = [
   },
   {
     q: "Which platforms can I post to?",
-    a: "X, Bluesky, Mastodon, LinkedIn, Threads, Facebook Pages, Discord and Telegram. You can post to several at once.",
+    a: "X, Bluesky, Mastodon, LinkedIn, Threads, Facebook Pages, Instagram, YouTube, TikTok, Discord and Telegram. You can post to several at once.",
   },
   {
     q: "Will the AI post things without asking me?",
@@ -204,7 +207,7 @@ export default function Landing() {
                 Let the goblins handle your <span className="text-goblin-600 dark:text-goblin-500">posting.</span>
               </h1>
               <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink/70">
-                Write once, schedule everywhere. PostGoblins plans, writes and publishes to eight networks, with an AI
+                Write once, schedule everywhere. PostGoblins plans, writes and publishes to eleven networks, with an AI
                 agent that actually does the work, not just the suggesting.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">

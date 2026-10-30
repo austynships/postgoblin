@@ -1,12 +1,15 @@
 import { bluesky } from "./bluesky";
 import { discord } from "./discord";
 import { facebook } from "./facebook";
+import { instagram } from "./instagram";
 import { linkedin } from "./linkedin";
 import { mastodon } from "./mastodon";
 import { telegram } from "./telegram";
 import { threads } from "./threads";
+import { tiktok } from "./tiktok";
 import type { Provider, ProviderId } from "./types";
 import { x } from "./x";
+import { youtube } from "./youtube";
 
 export const providers: Record<ProviderId, Provider> = {
   x,
@@ -15,6 +18,9 @@ export const providers: Record<ProviderId, Provider> = {
   linkedin,
   threads,
   facebook,
+  instagram,
+  youtube,
+  tiktok,
   discord,
   telegram,
 };
@@ -33,6 +39,7 @@ export function providerCatalog() {
     color: p.color,
     maxChars: p.maxChars,
     maxMedia: p.maxMedia,
+    requiresMedia: p.requiresMedia ?? null,
     connect: p.connect,
     fields: p.fields ?? [],
     configured: p.isConfigured(),

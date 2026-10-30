@@ -6,7 +6,7 @@ import { currentUser } from "@/lib/auth";
 export const metadata: Metadata = {
   title: "PostGoblins — the agentic social media scheduler",
   description:
-    "Write once, schedule everywhere. PostGoblins plans, writes and publishes to X, Bluesky, Mastodon, LinkedIn, Threads, Facebook, Discord and Telegram with an AI agent that does the work.",
+    "Write once, schedule everywhere. PostGoblins plans, writes and publishes to X, Bluesky, Mastodon, LinkedIn, Threads, Facebook, Instagram, YouTube, TikTok, Discord and Telegram with an AI agent that does the work.",
   openGraph: {
     title: "PostGoblins — the agentic social media scheduler",
     description: "Let the goblins handle your posting. Schedule everywhere with an AI agent that does the work.",

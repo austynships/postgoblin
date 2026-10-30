@@ -2,6 +2,9 @@ import { HttpError, handler, requireUser } from "@/lib/auth";
 import { createPost, listPosts, type PostStatus } from "@/lib/posts";
 import { publishSoon } from "@/lib/scheduler";
 
+// "Post now" publishes after the response (video uploads can take minutes).
+export const maxDuration = 300;
+
 export const GET = handler(async (req: Request) => {
   const user = await requireUser();
   const q = new URL(req.url).searchParams;

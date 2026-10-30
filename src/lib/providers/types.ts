@@ -5,6 +5,9 @@ export type ProviderId =
   | "linkedin"
   | "threads"
   | "facebook"
+  | "instagram"
+  | "youtube"
+  | "tiktok"
   | "discord"
   | "telegram";
 
@@ -73,6 +76,11 @@ export interface Provider {
   color: string;
   maxChars: number;
   maxMedia: number;
+  /**
+   * Media the platform insists on: "any" = at least one photo or video
+   * (Instagram), "video" = exactly one video (YouTube, TikTok).
+   */
+  requiresMedia?: "any" | "video";
   /** How the user connects: OAuth redirect, or a credentials form. */
   connect: "oauth" | "form";
   /** Fields collected before connecting (forms, or pre-OAuth like a Mastodon instance). */

@@ -6,7 +6,7 @@ import { runDue } from "@/lib/scheduler";
  * - Vercel Cron sends `Authorization: Bearer $CRON_SECRET` automatically.
  * - External pingers (cron-job.org etc.) can use the same header, or `?secret=…`.
  */
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 function authorized(req: Request) {

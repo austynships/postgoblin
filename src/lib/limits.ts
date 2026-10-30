@@ -7,6 +7,9 @@ export const CHAR_LIMITS: Record<string, number> = {
   threads: 500,
   linkedin: 3000,
   facebook: 63206,
+  instagram: 2200,
+  youtube: 5000,
+  tiktok: 2200,
   discord: 2000,
   telegram: 4096,
 };

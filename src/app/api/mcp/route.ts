@@ -16,7 +16,7 @@ const INSTRUCTIONS =
   "Call get_current_time and list_accounts first. Always pass scheduled_at as ISO-8601 with an explicit UTC offset. " +
   "Respect each platform's character limit (returned by list_accounts). Instagram needs at least one photo or video; YouTube and TikTok need exactly one video (use list_media for ids). Only use mode 'now' or delete_post when the user explicitly asked for that.";
 
-const READ_ONLY = new Set(["get_current_time", "list_accounts", "list_posts", "get_post", "find_open_slots", "list_media"]);
+const READ_ONLY = new Set(["get_current_time", "list_accounts", "list_posts", "get_post", "find_open_slots", "list_media", "get_analytics"]);
 const TITLES: Record<string, string> = {
   get_current_time: "Current time",
   list_accounts: "List connected accounts",
@@ -28,6 +28,7 @@ const TITLES: Record<string, string> = {
   retry_post: "Retry failed deliveries",
   find_open_slots: "Find open posting slots",
   list_media: "List uploaded media",
+  get_analytics: "Post analytics",
 };
 
 const toolList = mcpTools.map((t) => ({

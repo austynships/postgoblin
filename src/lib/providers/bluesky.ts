@@ -122,6 +122,18 @@ export const bluesky: Provider = {
     return { id: res.uri, url: `https://bsky.app/profile/${session.handle}/post/${rkey}`, ref: { uri: res.uri, cid: res.cid } };
   },
 
+  async metrics(_account, remoteId) {
+    // Public AppView: no login needed for public posts.
+    const res = await api(
+      `https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=${encodeURIComponent(remoteId)}`,
+      {},
+      "Bluesky metrics",
+    );
+    const p = res.posts?.[0];
+    if (!p) throw new ProviderError("Bluesky post not found (deleted?)", false);
+    return { views: null, likes: p.likeCount ?? 0, comments: p.replyCount ?? 0, shares: (p.repostCount ?? 0) + (p.quoteCount ?? 0) };
+  },
+
   async reply(account, { text, parent, root }) {
     const { service, identifier, password } = account.secrets as Record<string, string>;
     if (!parent.ref?.cid || !root.ref?.cid) throw new ProviderError("Missing Bluesky post reference for the reply", false);

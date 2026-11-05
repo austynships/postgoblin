@@ -146,6 +146,12 @@ export const instagram: Provider = {
     return { id: published.id, url: info.permalink };
   },
 
+  async metrics(account, remoteId) {
+    const { accessToken: token } = account.secrets as Record<string, string>;
+    const m = await api(`${graph()}/${remoteId}?fields=like_count,comments_count&access_token=${token}`, {}, "Instagram metrics");
+    return { views: null, likes: m.like_count ?? 0, comments: m.comments_count ?? 0, shares: null };
+  },
+
   async reply(account, { text, parent }) {
     const { accessToken: token } = account.secrets as Record<string, string>;
     const res = await api(

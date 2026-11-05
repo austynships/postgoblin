@@ -76,6 +76,17 @@ CREATE TABLE IF NOT EXISTS post_targets (
   UNIQUE (post_id, account_id)
 );
 
+-- Latest engagement numbers per published target (refreshed by the cron job).
+CREATE TABLE IF NOT EXISTS post_metrics (
+  target_id TEXT PRIMARY KEY REFERENCES post_targets(id) ON DELETE CASCADE,
+  views INTEGER,
+  likes INTEGER,
+  comments INTEGER,
+  shares INTEGER,
+  fetched_at BIGINT NOT NULL,
+  error TEXT
+);
+
 CREATE TABLE IF NOT EXISTS oauth_states (
   state TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

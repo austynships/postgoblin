@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Accounts from "./Accounts";
 import Agent from "./Agent";
+import Analytics from "./Analytics";
 import Calendar from "./Calendar";
 import Composer, { type ComposerSeed } from "./Composer";
 import PostsList from "./PostsList";
@@ -10,7 +11,7 @@ import Settings from "./Settings";
 import { ThemeToggle } from "./Theme";
 import { GoblinIcon, Logo, request, type AccountView, type ProviderInfo } from "./ui";
 
-type Tab = "calendar" | "posts" | "agent" | "accounts" | "settings";
+type Tab = "calendar" | "posts" | "analytics" | "agent" | "accounts" | "settings";
 type Me = {
   user: { id: string; name: string; email: string; timezone: string };
   providers: ProviderInfo[];
@@ -31,6 +32,11 @@ const NAV_ICONS: Record<Exclude<Tab, "agent">, React.ReactNode> = {
       <path d="M4 6h16M4 12h16M4 18h10" />
     </svg>
   ),
+  analytics: (
+    <svg viewBox="0 0 24 24" width={18} height={18} {...stroke}>
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </svg>
+  ),
   accounts: (
     <svg viewBox="0 0 24 24" width={18} height={18} {...stroke}>
       <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
@@ -48,6 +54,7 @@ const NAV_ICONS: Record<Exclude<Tab, "agent">, React.ReactNode> = {
 const TABS: { id: Tab; label: string }[] = [
   { id: "calendar", label: "Calendar" },
   { id: "posts", label: "Posts" },
+  { id: "analytics", label: "Analytics" },
   { id: "agent", label: "Agent" },
   { id: "accounts", label: "Accounts" },
   { id: "settings", label: "Settings & MCP" },
@@ -152,6 +159,7 @@ export default function Dashboard() {
         {tab === "posts" && (
           <PostsList version={version} onEdit={(post) => setComposer({ post })} onChanged={refresh} />
         )}
+        {tab === "analytics" && me && <Analytics providers={me.providers} onCompose={() => setComposer({})} />}
         {tab === "agent" && me && (
           <Agent aiEnabled={me.aiEnabled} hasAccounts={accounts.length > 0} onChanged={refresh} />
         )}

@@ -98,6 +98,21 @@ export const x: Provider = {
     return { id: res.data.id, url: `https://x.com/${account.username ?? "i"}/status/${res.data.id}` };
   },
 
+  async metrics(account, remoteId) {
+    const res = await api(
+      `https://api.x.com/2/tweets/${encodeURIComponent(remoteId)}?tweet.fields=public_metrics`,
+      { headers: { Authorization: `Bearer ${(account.secrets as any).accessToken}` } },
+      "X metrics",
+    );
+    const m = res.data?.public_metrics ?? {};
+    return {
+      views: m.impression_count ?? null,
+      likes: m.like_count ?? 0,
+      comments: m.reply_count ?? 0,
+      shares: (m.retweet_count ?? 0) + (m.quote_count ?? 0),
+    };
+  },
+
   async reply(account, { text, parent }) {
     const res = await api(
       "https://api.x.com/2/tweets",

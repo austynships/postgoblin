@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { refreshMetrics } from "@/lib/analytics";
 import { runDue } from "@/lib/scheduler";
 
 /**
@@ -26,7 +27,9 @@ export async function GET(req: Request) {
   if (!authorized(req)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const result = await runDue();
-    return Response.json({ ok: true, ...result, at: new Date().toISOString() });
+    // Analytics ride along in small batches so each run stays quick.
+    const metrics = await refreshMetrics({ limit: 15 }).catch((err) => ({ refreshed: 0, error: (err as Error).message }));
+    return Response.json({ ok: true, ...result, metrics, at: new Date().toISOString() });
   } catch (err) {
     return Response.json({ ok: false, error: (err as Error).message }, { status: 500 });
   }

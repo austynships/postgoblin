@@ -4,7 +4,7 @@ import { all, now, one, run } from "./db";
 import { getMedia } from "./media";
 import { partsFor, sanitizeOptions, supportsComments, textFor } from "./postOptions";
 import { getProvider } from "./providers";
-import { ProviderError } from "./providers/types";
+import { ProviderError, type AccountContext } from "./providers/types";
 
 const MAX_ATTEMPTS = 3;
 const REFRESH_WINDOW = 7 * 24 * 60 * 60 * 1000;
@@ -14,6 +14,19 @@ const STALE_CLAIM = 10 * 60 * 1000; // longer than the 300s function limit, so l
 type DueTarget = { id: string; post_id: string; account_id: string; attempts: number };
 
 const g = globalThis as unknown as { __pgScheduler?: { timer?: NodeJS.Timeout; running: boolean } };
+
+/** Refreshes an account's token when it is close to expiring (publishing and analytics). */
+export async function ensureFreshToken(account: AccountContext & { provider: string }) {
+  const provider = getProvider(account.provider);
+  if (provider.refresh && account.expiresAt && account.expiresAt - now() < REFRESH_WINDOW) {
+    const refreshed = await provider.refresh(account);
+    if (refreshed) {
+      await updateAccountSecrets(account.id, refreshed.secrets, refreshed.expiresAt);
+      account.secrets = refreshed.secrets;
+      account.expiresAt = refreshed.expiresAt ?? null;
+    }
+  }
+}
 
 async function publishTarget(target: DueTarget) {
   // Claim the row atomically so overlapping runs never double-post.
@@ -36,14 +49,7 @@ async function publishTarget(target: DueTarget) {
     if (!account) throw new ProviderError("Account was disconnected", false);
     const provider = getProvider(account.provider);
 
-    if (provider.refresh && account.expiresAt && account.expiresAt - now() < REFRESH_WINDOW) {
-      const refreshed = await provider.refresh(account);
-      if (refreshed) {
-        await updateAccountSecrets(account.id, refreshed.secrets, refreshed.expiresAt);
-        account.secrets = refreshed.secrets;
-        account.expiresAt = refreshed.expiresAt ?? null;
-      }
-    }
+    await ensureFreshToken(account);
 
     const media = await getMedia(post.user_id, JSON.parse(post.media));
     const options = sanitizeOptions(JSON.parse(post.options || "{}"));

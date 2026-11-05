@@ -109,6 +109,18 @@ export const youtube: Provider = {
     }));
   },
 
+  async metrics(account, remoteId) {
+    const n = (v: unknown) => (v === undefined || v === null || v === "" ? 0 : Number(v));
+    const res = await api(
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${encodeURIComponent(remoteId)}`,
+      { headers: { Authorization: `Bearer ${(account.secrets as any).accessToken}` } },
+      "YouTube metrics",
+    );
+    const s = res.items?.[0]?.statistics;
+    if (!s) throw new ProviderError("YouTube video not found (deleted or still processing?)", false);
+    return { views: n(s.viewCount), likes: n(s.likeCount), comments: n(s.commentCount), shares: null };
+  },
+
   async refresh(account) {
     const { refreshToken } = account.secrets as Record<string, string>;
     if (!refreshToken) return null;

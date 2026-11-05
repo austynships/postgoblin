@@ -24,7 +24,7 @@ export const facebook: Provider = {
     // login configuration; classic apps pass scopes directly.
     const configId = env("FACEBOOK_CONFIG_ID");
     if (configId) params.set("config_id", configId);
-    else params.set("scope", "pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_engagement");
+    else params.set("scope", "pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_engagement,pages_read_user_content");
     return `https://www.facebook.com/${env("FACEBOOK_GRAPH_VERSION") ?? "v23.0"}/dialog/oauth?${params}`;
   },
 
@@ -90,6 +90,18 @@ export const facebook: Provider = {
       postId = res.id;
     }
     return { id: postId, url: `https://www.facebook.com/${postId}` };
+  },
+
+  async metrics(account, remoteId) {
+    const token = (account.secrets as any).pageToken as string;
+    const fields = "reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares";
+    const p = await api(`${graph()}/${remoteId}?fields=${fields}&access_token=${token}`, {}, "Facebook metrics");
+    return {
+      views: null,
+      likes: p.reactions?.summary?.total_count ?? 0,
+      comments: p.comments?.summary?.total_count ?? 0,
+      shares: p.shares?.count ?? 0,
+    };
   },
 
   async reply(account, { text, parent }) {

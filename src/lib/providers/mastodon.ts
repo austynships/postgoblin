@@ -122,6 +122,16 @@ export const mastodon: Provider = {
     return { id: status.id, url: status.url };
   },
 
+  async metrics(account, remoteId) {
+    const { instance, accessToken } = account.secrets as Record<string, string>;
+    const s = await api(
+      `${instance}/api/v1/statuses/${encodeURIComponent(remoteId)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+      "Mastodon metrics",
+    );
+    return { views: null, likes: s.favourites_count ?? 0, comments: s.replies_count ?? 0, shares: s.reblogs_count ?? 0 };
+  },
+
   async reply(account, { text, parent }) {
     const { instance, accessToken } = account.secrets as Record<string, string>;
     const status = await api(

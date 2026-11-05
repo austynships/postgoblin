@@ -20,6 +20,7 @@
   --color-paper: #f4f7ee; /* page background */
   --color-surface: #ffffff; /* cards, inputs, sidebar */
   --color-outline: #1d1e23; /* sticker outlines on primary buttons */
+  --color-chart: #578a0f; /* single-series chart marks (validated: lightness band + 3:1 on surface) */
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-lilita), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -40,6 +41,7 @@
   --color-paper: #0f1012;
   --color-surface: #18191d;
   --color-outline: #000000;
+  --color-chart: #6aa313;
 
   --color-goblin-50: #161d0c;
   --color-goblin-100: #1f2a10;

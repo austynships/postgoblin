@@ -17,7 +17,7 @@ export const threads: Provider = {
     const params = new URLSearchParams({
       client_id: requireEnv("THREADS_APP_ID"),
       redirect_uri: redirectUri,
-      scope: "threads_basic,threads_content_publish,threads_manage_replies",
+      scope: "threads_basic,threads_content_publish,threads_manage_replies,threads_manage_insights",
       response_type: "code",
       state,
     });
@@ -114,6 +114,17 @@ export const threads: Provider = {
       () => ({}) as any,
     );
     return { id: published.id, url: info.permalink };
+  },
+
+  async metrics(account, remoteId) {
+    const token = (account.secrets as any).accessToken as string;
+    const res = await api(
+      `${GRAPH}/${encodeURIComponent(remoteId)}/insights?metric=views,likes,replies,reposts,quotes&access_token=${token}`,
+      {},
+      "Threads metrics",
+    );
+    const get = (name: string) => Number(res.data?.find((d: any) => d.name === name)?.values?.[0]?.value ?? 0);
+    return { views: get("views"), likes: get("likes"), comments: get("replies"), shares: get("reposts") + get("quotes") };
   },
 
   async reply(account, { text, parent }) {

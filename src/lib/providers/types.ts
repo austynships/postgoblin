@@ -61,6 +61,9 @@ export type PublishResult = {
   ref?: Record<string, string>;
 };
 
+/** Engagement numbers for one published post. null = the platform doesn't report it. */
+export type PostMetrics = { views: number | null; likes: number; comments: number; shares: number | null };
+
 export type ReplyInput = {
   text: string;
   /** The post being replied to (the previous thread part, or the main post). */
@@ -119,6 +122,8 @@ export interface Provider {
   publish(account: AccountContext, input: PublishInput): Promise<PublishResult>;
   /** Thread parts and first comments: post `text` as a reply/comment under `parent`. */
   reply?(account: AccountContext, input: ReplyInput): Promise<PublishResult>;
+  /** Analytics: current numbers for a post this account published (remote id from publish). */
+  metrics?(account: AccountContext, remoteId: string): Promise<PostMetrics>;
 }
 
 export class ProviderError extends Error {

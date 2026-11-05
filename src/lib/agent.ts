@@ -3,6 +3,7 @@ import { listAccounts } from "./accounts";
 import { HttpError, type User } from "./auth";
 import { id } from "./crypto";
 import { all, now, one, run, tx } from "./db";
+import { getAnalytics } from "./analytics";
 import { CHAR_LIMITS, countChars } from "./limits";
 import { publicMedia, getMedia } from "./media";
 import { createPost, deletePost, getPost, listPosts, retryFailed, updatePost, type PostStatus, type PostView } from "./posts";
@@ -52,6 +53,7 @@ How you work:
 - For a content calendar or campaign, schedule the whole series in one go, spaced sensibly, then summarise it as a short list (local time, platforms, first words of each post).
 - Scheduling and drafting are fine to do directly when asked. Publishing immediately (mode "now") and deleting posts are irreversible: only do them when the user has clearly asked for that specific action.
 - If no accounts are connected, say so and point the user to the Accounts tab. Drafts can still be saved without accounts.
+- For questions about performance, call get_analytics and answer with the few numbers that matter (and what to post more of), not a data dump.
 - Keep replies brief and concrete. Don't paste raw ids at the user unless useful.`;
 
 const tools: Tool[] = [
@@ -208,6 +210,16 @@ const tools: Tool[] = [
         weekdays_only: { type: "boolean" },
       },
       required: ["days"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_analytics",
+    description:
+      "Engagement for posts published in the last N days: totals, per-platform numbers, daily trend and the top posts. Covers X, Bluesky, Mastodon, Threads, Facebook, Instagram and YouTube (LinkedIn, Discord, Telegram and TikTok don't report numbers). Numbers refresh roughly hourly.",
+    input_schema: {
+      type: "object",
+      properties: { days: { type: "integer", minimum: 1, maximum: 365, description: "Default 30." } },
       additionalProperties: false,
     },
   },
@@ -405,6 +417,21 @@ export async function runTool(
         }
       }
       return { result: { timezone: tz, slots } };
+    }
+    case "get_analytics": {
+      const a = await getAnalytics(user.id, tz, input.days ?? 30);
+      return {
+        result: {
+          days: a.days,
+          totals: a.totals,
+          by_platform: a.platforms.map((p) => ({ platform: p.provider, posts: p.posts, views: p.views, likes: p.likes, comments: p.comments, shares: p.shares, reports_metrics: p.tracked })),
+          top_posts: a.top.slice(0, 5).map((t) => ({ post_id: t.postId, platform: t.provider, published: isoInZone(t.publishedAt, tz), text: t.content.slice(0, 120), views: t.views, likes: t.likes, comments: t.comments, shares: t.shares, url: t.url })),
+          busiest_days: [...a.daily].sort((x, y) => y.engagement - x.engagement).slice(0, 3),
+          not_yet_fetched: a.pending,
+          last_updated: a.lastUpdated ? isoInZone(a.lastUpdated, tz) : null,
+          problems: a.errors,
+        },
+      };
     }
     case "list_media": {
       const ids = (

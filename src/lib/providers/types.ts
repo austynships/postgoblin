@@ -45,8 +45,15 @@ export type MediaFile = {
   size: number;
 };
 
-export type PublishInput = { text: string; media: MediaFile[]; options?: PostOptions };
-export type PublishResult = { id: string; url?: string };
+export type PublishInput = {
+  text: string;
+  media: MediaFile[];
+  options?: PostOptions;
+  /** YouTube custom thumbnail, resolved from options.youtube.thumbnailId. */
+  thumbnail?: MediaFile;
+};
+/** `warning`: published, but something optional (e.g. a thumbnail) didn't apply. */
+export type PublishResult = { id: string; url?: string; warning?: string };
 
 /** An account as handed to a provider at publish time. */
 export type AccountContext = {

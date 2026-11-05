@@ -46,15 +46,14 @@ async function publishTarget(target: DueTarget) {
     }
 
     const media = await getMedia(post.user_id, JSON.parse(post.media));
-    const result = await provider.publish(account, {
-      text: post.content,
-      media,
-      options: sanitizeOptions(JSON.parse(post.options || "{}")),
-    });
+    const options = sanitizeOptions(JSON.parse(post.options || "{}"));
+    const thumbId = account.provider === "youtube" ? options.youtube?.thumbnailId : undefined;
+    const thumbnail = thumbId ? (await getMedia(post.user_id, [thumbId]).catch(() => []))[0] : undefined;
+    const result = await provider.publish(account, { text: post.content, media, options, thumbnail });
     await run(
-      `UPDATE post_targets SET status = 'published', remote_id = ?, remote_url = ?, error = NULL, attempts = ?
+      `UPDATE post_targets SET status = 'published', remote_id = ?, remote_url = ?, error = ?, attempts = ?
        WHERE id = ?`,
-      [result.id, result.url ?? null, attempts, target.id],
+      [result.id, result.url ?? null, result.warning ?? null, attempts, target.id],
     );
     if (account.status !== "active") await markAccount(account.id, "active");
   } catch (err) {

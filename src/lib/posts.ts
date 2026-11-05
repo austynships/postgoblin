@@ -4,7 +4,7 @@ import { id } from "./crypto";
 import { all, now, one, run, tx } from "./db";
 import { CHAR_LIMITS, countChars } from "./limits";
 import { getMedia, publicMedia, type PublicMedia } from "./media";
-import { sanitizeOptions, youtubeProblems, type PostOptions } from "./postOptions";
+import { YOUTUBE_THUMBNAIL_MAX_BYTES, sanitizeOptions, youtubeProblems, type PostOptions } from "./postOptions";
 import { getProvider } from "./providers";
 
 export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "partial" | "failed";
@@ -14,6 +14,8 @@ export type PostView = {
   content: string;
   media: PublicMedia[];
   options: PostOptions;
+  /** The YouTube custom thumbnail, when one is set. */
+  thumbnail: PublicMedia | null;
   status: PostStatus;
   scheduledAt: number | null;
   publishedAt: number | null;
@@ -72,11 +74,19 @@ async function hydrate(userId: string, rows: PostRow[]): Promise<PostView[]> {
       try {
         media = (await getMedia(userId, mediaIds)).map(publicMedia);
       } catch {}
+      const options = sanitizeOptions(JSON.parse(r.options || "{}"));
+      let thumbnail: PublicMedia | null = null;
+      if (options.youtube?.thumbnailId) {
+        try {
+          thumbnail = publicMedia((await getMedia(userId, [options.youtube.thumbnailId]))[0]);
+        } catch {}
+      }
       return {
         id: r.id,
         content: r.content,
         media,
-        options: sanitizeOptions(JSON.parse(r.options || "{}")),
+        options,
+        thumbnail,
         status: r.status,
         scheduledAt: r.scheduled_at,
         publishedAt: r.published_at,
@@ -162,6 +172,12 @@ async function validate(userId: string, input: PostInput) {
     throw new HttpError(400, `Can't post to some platforms — ${problems.join("; ")}`);
   }
   const options = sanitizeOptions(input.options);
+  const thumbId = options.youtube?.thumbnailId;
+  if (thumbId) {
+    const [thumb] = await getMedia(userId, [thumbId]);
+    if (!thumb.mime.startsWith("image/")) throw new HttpError(400, "YouTube thumbnail must be an image");
+    if (thumb.size > YOUTUBE_THUMBNAIL_MAX_BYTES) throw new HttpError(400, "YouTube thumbnail image is too large (max 20 MB)");
+  }
   if (input.mode !== "draft" && accounts.some((a) => a.provider === "youtube")) {
     const yt = youtubeProblems(options);
     if (yt.length) throw new HttpError(400, yt.join("; "));

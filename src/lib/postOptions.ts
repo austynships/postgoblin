@@ -12,6 +12,8 @@ export type YouTubeOptions = {
    */
   madeForKids?: boolean;
   tags?: string[];
+  /** Media id of an uploaded image to use as the custom thumbnail. */
+  thumbnailId?: string;
 };
 
 export type PostOptions = {
@@ -22,6 +24,8 @@ export const YOUTUBE_PRIVACY: YouTubePrivacy[] = ["public", "unlisted", "private
 export const YOUTUBE_TITLE_MAX = 100;
 /** YouTube allows 500 characters of tags in total. */
 export const YOUTUBE_TAGS_MAX_CHARS = 500;
+/** Thumbnails are converted to JPEG on upload; this caps the original image. */
+export const YOUTUBE_THUMBNAIL_MAX_BYTES = 20 * 1024 * 1024;
 
 /** First non-empty line of the post, cleaned for use as a YouTube title. */
 export function defaultYouTubeTitle(content: string) {
@@ -43,6 +47,7 @@ export function sanitizeOptions(raw: unknown): PostOptions {
     if (typeof yt.title === "string" && yt.title.trim()) clean.title = yt.title.replace(/[<>]/g, "").trim().slice(0, YOUTUBE_TITLE_MAX);
     if (YOUTUBE_PRIVACY.includes(yt.privacy as YouTubePrivacy)) clean.privacy = yt.privacy;
     if (typeof yt.madeForKids === "boolean") clean.madeForKids = yt.madeForKids;
+    if (typeof yt.thumbnailId === "string" && /^[\w-]{1,64}$/.test(yt.thumbnailId)) clean.thumbnailId = yt.thumbnailId;
     const tags = parseTags(yt.tags);
     if (tags.length) clean.tags = tags;
     out.youtube = clean;

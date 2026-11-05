@@ -1,12 +1,49 @@
 import { pkceChallenge } from "../crypto";
 import { api, env, form, readMedia, requireEnv } from "./http";
 import { defaultYouTubeTitle } from "../postOptions";
-import { ProviderError, type Provider } from "./types";
+import { ProviderError, type MediaFile, type Provider } from "./types";
 
 // YouTube Data API v3 with Google OAuth. One video per post. Title, privacy,
 // made-for-kids and tags come from the post's YouTube settings; the full text
 // is the description.
 const SCOPES = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly";
+
+/** YouTube thumbnails: JPEG/PNG up to 2 MB, ideally 1280x720. */
+async function thumbnailJpeg(file: MediaFile) {
+  const sharp = (await import("sharp")).default;
+  const source = Buffer.from(await (await readMedia(file)).arrayBuffer());
+  for (const quality of [90, 80, 65, 50]) {
+    const jpeg = await sharp(source)
+      .rotate()
+      .resize(1280, 720, { fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality })
+      .toBuffer();
+    if (jpeg.length <= 2 * 1024 * 1024) return jpeg;
+  }
+  throw new Error("Thumbnail is still over 2 MB after compression");
+}
+
+async function setThumbnail(auth: Record<string, string>, videoId: string, file: MediaFile) {
+  let body: Buffer;
+  try {
+    body = await thumbnailJpeg(file);
+  } catch (err) {
+    throw new Error(`Video published, but the thumbnail couldn't be prepared: ${(err as Error).message}`);
+  }
+  const res = await fetch(
+    `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(videoId)}&uploadType=media`,
+    { method: "POST", headers: { ...auth, "Content-Type": "image/jpeg" }, body: new Uint8Array(body) },
+  );
+  if (res.ok) return;
+  const detail = await res.text();
+  if (res.status === 403) {
+    throw new Error(
+      "Video published, but YouTube refused the custom thumbnail. Custom thumbnails need a verified channel: verify at youtube.com/verify, then set the thumbnail in YouTube Studio.",
+    );
+  }
+  throw new Error(`Video published, but the thumbnail failed (YouTube ${res.status}): ${detail.slice(0, 200)}`);
+}
 
 async function token(params: Record<string, string>) {
   return api(
@@ -82,7 +119,7 @@ export const youtube: Provider = {
     };
   },
 
-  async publish(account, { text, media, options }) {
+  async publish(account, { text, media, options, thumbnail }) {
     const yt = options?.youtube ?? {};
     if (typeof yt.madeForKids !== "boolean") {
       throw new ProviderError("YouTube: choose whether the video is made for kids, then retry", false);
@@ -128,6 +165,17 @@ export const youtube: Provider = {
       { method: "PUT", headers: { "Content-Type": video.mime }, body: await readMedia(video), signal: AbortSignal.timeout(280_000) },
       "YouTube upload",
     );
-    return { id: uploaded.id, url: `https://www.youtube.com/watch?v=${uploaded.id}` };
+    const result = { id: uploaded.id as string, url: `https://www.youtube.com/watch?v=${uploaded.id}` };
+
+    // The video is live at this point, so a thumbnail problem must not fail
+    // (and retry, re-uploading) the post: report it as a warning instead.
+    if (thumbnail) {
+      try {
+        await setThumbnail(auth, result.id, thumbnail);
+      } catch (err) {
+        return { ...result, warning: (err as Error).message };
+      }
+    }
+    return result;
   },
 };

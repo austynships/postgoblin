@@ -63,6 +63,8 @@ export default function Composer({
   const [progress, setProgress] = useState<number | null>(null);
   const [yt, setYt] = useState<YouTubeOptions>(post?.options?.youtube ?? {});
   const [ytTags, setYtTags] = useState((post?.options?.youtube?.tags ?? []).join(", "));
+  const [thumb, setThumb] = useState<Media | null>(post?.thumbnail ?? null);
+  const thumbRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const chosen = accounts.filter((a) => selected.includes(a.id));
@@ -140,6 +142,25 @@ export default function Composer({
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  async function uploadThumbnail(file: File | undefined) {
+    if (!file) return;
+    setError("");
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      setError("Thumbnail must be a JPG, PNG, WebP or GIF image");
+    } else {
+      setBusy("thumb");
+      setProgress(0);
+      try {
+        setThumb(await uploadOne(file));
+      } catch (err) {
+        setError(`${file.name}: ${(err as Error).message}`);
+      }
+      setBusy(null);
+      setProgress(null);
+    }
+    if (thumbRef.current) thumbRef.current.value = "";
+  }
+
   async function runAi(instruction: string) {
     if (!instruction.trim()) return;
     setBusy("ai");
@@ -164,7 +185,7 @@ export default function Composer({
       content,
       accountIds: selected,
       mediaIds: media.map((m) => m.id),
-      options: { ...post?.options, youtube: { ...yt, tags: parseTags(ytTags) } },
+      options: { ...post?.options, youtube: { ...yt, tags: parseTags(ytTags), thumbnailId: thumb?.id } },
       mode,
       scheduledAt: mode === "schedule" ? new Date(when).getTime() : null,
     };
@@ -425,6 +446,52 @@ export default function Composer({
                   Separate with commas. {parseTags(ytTags).join(",").length}/{YOUTUBE_TAGS_MAX_CHARS} characters.
                 </p>
               </div>
+              <div>
+                <span className="label">Thumbnail</span>
+                <div className="flex items-start gap-3">
+                  {thumb ? (
+                    <div className="group relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg border border-ink/15">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={thumb.url} alt="Video thumbnail" className="h-full w-full object-cover" />
+                      {!locked && (
+                        <button
+                          type="button"
+                          onClick={() => setThumb(null)}
+                          className="absolute top-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-black/80 text-xs text-white"
+                          aria-label="Remove thumbnail"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => thumbRef.current?.click()}
+                      disabled={busy === "thumb"}
+                      className="grid aspect-video w-40 shrink-0 place-items-center rounded-lg border border-dashed border-ink/20 text-xs text-ink/60 hover:border-ink/30"
+                    >
+                      {busy === "thumb" ? (progress ? `${progress}%` : "Uploading…") : "+ Add thumbnail"}
+                    </button>
+                  )}
+                  <div className="space-y-2 text-xs text-ink/50">
+                    <p>Optional. 1280×720 (16:9) works best. We resize and convert it to fit YouTube’s 2 MB limit.</p>
+                    <p>Custom thumbnails only work on verified channels (youtube.com/verify).</p>
+                    {thumb && !locked && (
+                      <button type="button" className="text-goblin-800 hover:underline" onClick={() => thumbRef.current?.click()}>
+                        Replace
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={thumbRef}
+                    type="file"
+                    hidden
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => uploadThumbnail(e.target.files?.[0])}
+                  />
+                </div>
+              </div>
             </fieldset>
           )}
 
@@ -443,7 +510,11 @@ export default function Composer({
                           View ↗
                         </a>
                       )}
-                      {t.error && <div className="mt-0.5 text-xs break-words text-red-700">{t.error}</div>}
+                      {t.error && (
+                        <div className={`mt-0.5 text-xs break-words ${t.status === "published" ? "text-amber-700" : "text-red-700"}`}>
+                          {t.error}
+                        </div>
+                      )}
                     </span>
                   </li>
                 ))}

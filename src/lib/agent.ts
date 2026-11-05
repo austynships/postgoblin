@@ -46,7 +46,7 @@ How you work:
 - Write native-sounding copy for each platform and respect character limits: ${Object.entries(CHAR_LIMITS)
   .map(([k, v]) => `${k} ${v}`)
   .join(", ")}. When one text can't fit every chosen platform well, create separate posts (e.g. a short one for X/Bluesky and a longer one for LinkedIn).
-- Media rules: Instagram posts need at least one photo or video; YouTube and TikTok posts need exactly one video (set the YouTube title/privacy/tags with the youtube parameter). Before scheduling or posting to YouTube, always ask the user whether the video is made for kids (a legal requirement; never guess) and pass youtube.made_for_kids. Use list_media to find uploaded files; if the user hasn't uploaded what a platform needs, say so instead of creating a post that will fail.
+- Media rules: Instagram posts need at least one photo or video; YouTube and TikTok posts need exactly one video (set the YouTube title/privacy/tags/thumbnail with the youtube parameter; a thumbnail is an uploaded image, not part of media_ids). Before scheduling or posting to YouTube, always ask the user whether the video is made for kids (a legal requirement; never guess) and pass youtube.made_for_kids. Use list_media to find uploaded files; if the user hasn't uploaded what a platform needs, say so instead of creating a post that will fail.
 - Times: every user message starts with a <context> block giving the current time and the user's timezone. Interpret times like "tomorrow at 9" in that timezone, and always pass scheduled_at as ISO-8601 with an explicit offset. Use find_open_slots when the user wants you to pick good times.
 - For a content calendar or campaign, schedule the whole series in one go, spaced sensibly, then summarise it as a short list (local time, platforms, first words of each post).
 - Scheduling and drafting are fine to do directly when asked. Publishing immediately (mode "now") and deleting posts are irreversible: only do them when the user has clearly asked for that specific action.
@@ -107,6 +107,10 @@ const tools: Tool[] = [
             privacy: { type: "string", enum: ["public", "unlisted", "private"] },
             made_for_kids: { type: "boolean", description: "Ask the user; never assume." },
             tags: { type: "array", items: { type: "string" } },
+            thumbnail_media_id: {
+              type: "string",
+              description: "Id of an uploaded image (from list_media) to use as the custom thumbnail. Empty string removes it.",
+            },
           },
           additionalProperties: false,
         },
@@ -136,6 +140,10 @@ const tools: Tool[] = [
             privacy: { type: "string", enum: ["public", "unlisted", "private"] },
             made_for_kids: { type: "boolean", description: "Ask the user; never assume." },
             tags: { type: "array", items: { type: "string" } },
+            thumbnail_media_id: {
+              type: "string",
+              description: "Id of an uploaded image (from list_media) to use as the custom thumbnail. Empty string removes it.",
+            },
           },
           additionalProperties: false,
         },
@@ -210,6 +218,7 @@ function youtubeOptions(input: any, existing: PostOptions = {}): PostOptions | u
   if (input.privacy !== undefined) yt.privacy = input.privacy;
   if (input.made_for_kids !== undefined) yt.madeForKids = input.made_for_kids;
   if (input.tags !== undefined) yt.tags = input.tags;
+  if (input.thumbnail_media_id !== undefined) yt.thumbnailId = input.thumbnail_media_id || undefined;
   return { ...existing, youtube: yt };
 }
 

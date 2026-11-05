@@ -3,6 +3,7 @@
 import type { AccountView } from "@/lib/accounts";
 import type { PostView } from "@/lib/posts";
 import type { ProviderInfo } from "@/lib/providers";
+import BrandIcon from "./BrandIcon";
 
 export type { AccountView, PostView, ProviderInfo };
 
@@ -19,49 +20,18 @@ export async function request<T = any>(url: string, opts: { method?: string; bod
   return data;
 }
 
-const SHORT: Record<string, string> = {
-  x: "𝕏",
-  bluesky: "🦋",
-  mastodon: "M",
-  linkedin: "in",
-  threads: "@",
-  facebook: "f",
-  instagram: "ig",
-  youtube: "▶",
-  tiktok: "♪",
-  discord: "D",
-  telegram: "✈",
-};
-
-export const PROVIDER_COLORS: Record<string, string> = {
-  x: "#000000",
-  bluesky: "#1185fe",
-  mastodon: "#6364ff",
-  linkedin: "#0a66c2",
-  threads: "#000000",
-  facebook: "#0866ff",
-  instagram: "#e1306c",
-  youtube: "#ff0000",
-  tiktok: "#000000",
-  discord: "#5865f2",
-  telegram: "#229ed9",
-};
-
+/**
+ * A platform's real logo (see BrandIcon) on a small round chip, so badges keep
+ * one shape everywhere — including the corner badge on account avatars.
+ */
 export function ProviderIcon({ provider, size = 18 }: { provider: string; size?: number }) {
-  const color = PROVIDER_COLORS[provider] ?? "#888";
   return (
     <span
-      className="inline-grid shrink-0 place-items-center rounded-full font-bold leading-none ring-1 ring-ink/10"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.55,
-        background: color,
-        color: "#fff",
-      }}
-      aria-label={provider}
+      className="inline-grid shrink-0 place-items-center rounded-full bg-surface text-ink ring-1 ring-ink/10"
+      style={{ width: size, height: size }}
+      title={provider}
     >
-      {SHORT[provider] ?? "?"}
+      <BrandIcon provider={provider} size={Math.round(size * 0.68)} />
     </span>
   );
 }

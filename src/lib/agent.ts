@@ -8,7 +8,7 @@ import { publicMedia, getMedia } from "./media";
 import { createPost, deletePost, getPost, listPosts, retryFailed, updatePost, type PostStatus, type PostView } from "./posts";
 import { publishSoon } from "./scheduler";
 import { isoInZone, parseIsoWithOffset, zonedToEpoch } from "./time";
-import type { PostOptions, YouTubeOptions } from "./postOptions";
+import { PLATFORM_IDS, textFor, type PostOptions, type YouTubeOptions } from "./postOptions";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type Tool = Anthropic.Beta.Messages.BetaTool;
@@ -45,7 +45,7 @@ How you work:
 - Use the tools to look things up rather than guessing. Call list_accounts before targeting accounts; only use account ids it returns.
 - Write native-sounding copy for each platform and respect character limits: ${Object.entries(CHAR_LIMITS)
   .map(([k, v]) => `${k} ${v}`)
-  .join(", ")}. When one text can't fit every chosen platform well, create separate posts (e.g. a short one for X/Bluesky and a longer one for LinkedIn).
+  .join(", ")}. When platforms need different wording (e.g. a short X/Bluesky version and a longer LinkedIn one), keep one post and use platform_text to give those platforms their own text; content is used everywhere else. Check each target's chars in the result.
 - Media rules: Instagram posts need at least one photo or video; YouTube and TikTok posts need exactly one video (set the YouTube title/privacy/tags/thumbnail with the youtube parameter; a thumbnail is an uploaded image, not part of media_ids). Before scheduling or posting to YouTube, always ask the user whether the video is made for kids (a legal requirement; never guess) and pass youtube.made_for_kids. Use list_media to find uploaded files; if the user hasn't uploaded what a platform needs, say so instead of creating a post that will fail.
 - Times: every user message starts with a <context> block giving the current time and the user's timezone. Interpret times like "tomorrow at 9" in that timezone, and always pass scheduled_at as ISO-8601 with an explicit offset. Use find_open_slots when the user wants you to pick good times.
 - For a content calendar or campaign, schedule the whole series in one go, spaced sensibly, then summarise it as a short list (local time, platforms, first words of each post).
@@ -99,6 +99,13 @@ const tools: Tool[] = [
         mode: { type: "string", enum: ["draft", "schedule", "now"] },
         scheduled_at: { type: "string", description: 'Required when mode is "schedule". ISO-8601 with offset.' },
         media_ids: { type: "array", items: { type: "string" }, description: "Ids from list_media." },
+        platform_text: {
+          type: "object",
+          description:
+            "Optional text for specific platforms, replacing content there (keys are platform names). On update, an empty string removes a platform's own text.",
+          properties: Object.fromEntries(PLATFORM_IDS.map((p) => [p, { type: "string" }])),
+          additionalProperties: false,
+        },
         youtube: {
           type: "object",
           description: "YouTube settings, used when a YouTube account is selected. made_for_kids is required to schedule or post to YouTube.",
@@ -132,6 +139,13 @@ const tools: Tool[] = [
         mode: { type: "string", enum: ["draft", "schedule", "now"] },
         scheduled_at: { type: "string", description: "ISO-8601 with offset" },
         media_ids: { type: "array", items: { type: "string" } },
+        platform_text: {
+          type: "object",
+          description:
+            "Optional text for specific platforms, replacing content there (keys are platform names). On update, an empty string removes a platform's own text.",
+          properties: Object.fromEntries(PLATFORM_IDS.map((p) => [p, { type: "string" }])),
+          additionalProperties: false,
+        },
         youtube: {
           type: "object",
           description: "YouTube settings, used when a YouTube account is selected. made_for_kids is required to schedule or post to YouTube.",
@@ -210,16 +224,30 @@ export const mcpTools: Tool[] = [
   ...tools,
 ];
 
-/** Agent tool input (snake_case) → stored YouTube options, merged over any existing ones. */
-function youtubeOptions(input: any, existing: PostOptions = {}): PostOptions | undefined {
-  if (!input || typeof input !== "object") return undefined;
+/** Agent tool input (snake_case) → stored options, merged over any existing ones. */
+function buildOptions(input: any, existing: PostOptions = {}): PostOptions | undefined {
+  if (!input.youtube && !input.platform_text) return undefined;
+  const out: PostOptions = { ...existing };
+  if (input.platform_text && typeof input.platform_text === "object") {
+    const text: Record<string, string> = { ...existing.text };
+    for (const [k, v] of Object.entries(input.platform_text)) {
+      if (typeof v === "string" && v.trim()) text[k] = v;
+      else delete text[k];
+    }
+    out.text = text;
+  }
+  if (input.youtube && typeof input.youtube === "object") out.youtube = youtubeOptions(input.youtube, existing);
+  return out;
+}
+
+function youtubeOptions(input: any, existing: PostOptions): YouTubeOptions {
   const yt: YouTubeOptions = { ...existing.youtube };
   if (input.title !== undefined) yt.title = input.title;
   if (input.privacy !== undefined) yt.privacy = input.privacy;
   if (input.made_for_kids !== undefined) yt.madeForKids = input.made_for_kids;
   if (input.tags !== undefined) yt.tags = input.tags;
   if (input.thumbnail_media_id !== undefined) yt.thumbnailId = input.thumbnail_media_id || undefined;
-  return { ...existing, youtube: yt };
+  return yt;
 }
 
 function summarizePost(p: PostView, tz: string) {
@@ -230,6 +258,7 @@ function summarizePost(p: PostView, tz: string) {
     published_at: p.publishedAt ? isoInZone(p.publishedAt, tz) : null,
     content: p.content,
     media: p.media.map((m) => m.name),
+    ...(p.options.text ? { platform_text: p.options.text } : {}),
     ...(p.options.youtube ? { youtube: p.options.youtube } : {}),
     created_by: p.createdBy,
     targets: p.targets.map((t) => ({
@@ -239,7 +268,7 @@ function summarizePost(p: PostView, tz: string) {
       status: t.status,
       url: t.remoteUrl,
       error: t.error,
-      chars: `${countChars(t.provider, p.content)}/${CHAR_LIMITS[t.provider]}`,
+      chars: `${countChars(t.provider, textFor(p.content, p.options, t.provider))}/${CHAR_LIMITS[t.provider]}`,
     })),
   };
 }
@@ -295,7 +324,7 @@ export async function runTool(
           content: input.content,
           accountIds: input.account_ids ?? [],
           mediaIds: input.media_ids ?? [],
-          options: youtubeOptions(input.youtube),
+          options: buildOptions(input),
           mode: input.mode,
           scheduledAt: time(input.scheduled_at),
         },
@@ -309,7 +338,8 @@ export async function runTool(
       };
     }
     case "update_post": {
-      const options = input.youtube ? youtubeOptions(input.youtube, (await getPost(user.id, input.post_id)).options) : undefined;
+      const options =
+        input.youtube || input.platform_text ? buildOptions(input, (await getPost(user.id, input.post_id)).options) : undefined;
       const post = await updatePost(user.id, input.post_id, {
         options,
         content: input.content,

@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { loadAccountContext, markAccount, updateAccountSecrets } from "./accounts";
 import { all, now, one, run } from "./db";
 import { getMedia } from "./media";
-import { sanitizeOptions } from "./postOptions";
+import { sanitizeOptions, textFor } from "./postOptions";
 import { getProvider } from "./providers";
 import { ProviderError } from "./providers/types";
 
@@ -49,7 +49,12 @@ async function publishTarget(target: DueTarget) {
     const options = sanitizeOptions(JSON.parse(post.options || "{}"));
     const thumbId = account.provider === "youtube" ? options.youtube?.thumbnailId : undefined;
     const thumbnail = thumbId ? (await getMedia(post.user_id, [thumbId]).catch(() => []))[0] : undefined;
-    const result = await provider.publish(account, { text: post.content, media, options, thumbnail });
+    const result = await provider.publish(account, {
+      text: textFor(post.content, options, account.provider),
+      media,
+      options,
+      thumbnail,
+    });
     await run(
       `UPDATE post_targets SET status = 'published', remote_id = ?, remote_url = ?, error = ?, attempts = ?
        WHERE id = ?`,

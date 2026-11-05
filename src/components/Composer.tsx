@@ -7,6 +7,7 @@ import {
   YOUTUBE_TITLE_MAX,
   defaultYouTubeTitle,
   parseTags,
+  textFor,
   type YouTubeOptions,
   type YouTubePrivacy,
 } from "@/lib/postOptions";
@@ -45,6 +46,9 @@ export default function Composer({
   const post = seed.post;
   const locked = post && ["publishing", "published", "partial"].includes(post.status);
   const [content, setContent] = useState(post?.content ?? "");
+  /** Per-platform versions of the text. Missing = uses the main text. */
+  const [texts, setTexts] = useState<Record<string, string>>(post?.options?.text ?? {});
+  const [tab, setTab] = useState<string>("all");
   const [selected, setSelected] = useState<string[]>(
     post ? post.targets.map((t) => t.accountId) : accounts.filter((a) => a.status === "active").map((a) => a.id),
   );
@@ -69,7 +73,21 @@ export default function Composer({
 
   const chosen = accounts.filter((a) => selected.includes(a.id));
   const platforms = [...new Set(chosen.map((a) => a.provider))];
-  const counts = platforms.map((p) => ({ p, n: countChars(p, content), max: CHAR_LIMITS[p] }));
+  const activeTab = platforms.includes(tab as never) ? tab : "all";
+  const customized = (p: string) => texts[p] !== undefined && texts[p].trim() !== "";
+  /** What each platform will actually get. */
+  const effectiveText = (p: string) => (customized(p) ? texts[p] : content);
+  const counts = platforms.map((p) => ({ p, n: countChars(p, effectiveText(p)), max: CHAR_LIMITS[p], custom: customized(p) }));
+  const editorValue = activeTab === "all" ? content : (texts[activeTab] ?? content);
+  const setEditorValue = (v: string) =>
+    activeTab === "all" ? setContent(v) : setTexts((cur) => ({ ...cur, [activeTab]: v }));
+  const resetTab = (p: string) =>
+    setTexts((cur) => {
+      const next = { ...cur };
+      delete next[p];
+      return next;
+    });
+  const hasText = !!content.trim() || platforms.some(customized);
   const tooLong = counts.some((c) => c.n > c.max);
   // The most restrictive limit among selected platforms (10 when none are selected).
   const maxMedia = Math.min(10, ...platforms.map((p) => providers.find((x) => x.id === p)?.maxMedia ?? 10));
@@ -168,9 +186,9 @@ export default function Composer({
     try {
       const { text } = await request<{ text: string }>("/api/ai/assist", {
         method: "POST",
-        body: { instruction, content, platforms },
+        body: { instruction, content: editorValue, platforms: activeTab === "all" ? platforms : [activeTab] },
       });
-      setContent(text);
+      setEditorValue(text);
       setAiPrompt("");
     } catch (err) {
       setError((err as Error).message);
@@ -185,7 +203,10 @@ export default function Composer({
       content,
       accountIds: selected,
       mediaIds: media.map((m) => m.id),
-      options: { ...post?.options, youtube: { ...yt, tags: parseTags(ytTags), thumbnailId: thumb?.id } },
+      options: {
+        ...post?.options,
+        text: Object.fromEntries(platforms.filter(customized).map((p) => [p, texts[p]])),
+        youtube: { ...yt, tags: parseTags(ytTags), thumbnailId: thumb?.id } },
       mode,
       scheduledAt: mode === "schedule" ? new Date(when).getTime() : null,
     };
@@ -216,7 +237,8 @@ export default function Composer({
     }
   }
 
-  const previewAccount = chosen[0];
+  const previewAccount = (activeTab !== "all" && chosen.find((a) => a.provider === activeTab)) || chosen[0];
+  const previewText = previewAccount ? effectiveText(previewAccount.provider) : content;
   const QUICK = useMemo(
     () => ["Make it punchier", "Shorten to fit every platform", "Add 2–3 relevant hashtags", "Fix grammar", "Write a hook-first version"],
     [],
@@ -272,18 +294,68 @@ export default function Composer({
           {/* Content */}
           <div>
             <div className="label">Content</div>
+            {platforms.length > 1 || platforms.some(customized) ? (
+              <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Text for each platform">
+                {["all", ...platforms].map((p) => {
+                  const on = activeTab === p;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => setTab(p)}
+                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition ${
+                        on ? "border-goblin-500/60 bg-goblin-500/10 font-semibold text-ink" : "border-ink/15 text-ink/60 hover:text-ink"
+                      }`}
+                    >
+                      {p === "all" ? "All platforms" : <ProviderIcon provider={p} size={14} />}
+                      {p !== "all" && <span>{providerName(p)}</span>}
+                      {p !== "all" && customized(p) && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-goblin-500" title="Has its own text" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             <textarea
               className="input min-h-[180px] resize-y leading-relaxed"
-              value={content}
+              value={editorValue}
               disabled={!!locked}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="What do you want to share?"
+              onChange={(e) => setEditorValue(e.target.value)}
+              placeholder={activeTab === "all" ? "What do you want to share?" : `Text for ${providerName(activeTab)}…`}
+              aria-label={activeTab === "all" ? "Main text" : `Text for ${providerName(activeTab)}`}
             />
+            {activeTab !== "all" && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-ink/60">
+                {customized(activeTab) ? (
+                  <>
+                    <span>{providerName(activeTab)} gets its own text.</span>
+                    {!locked && (
+                      <button type="button" className="text-goblin-800 hover:underline" onClick={() => resetTab(activeTab)}>
+                        Use the main text instead
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span>
+                    Using the main text. Edit it here to give {providerName(activeTab)} its own version; other platforms won’t
+                    change.
+                  </span>
+                )}
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              {counts.map(({ p, n, max }) => (
-                <span key={p} className={`flex items-center gap-1.5 text-xs ${n > max ? "text-red-700" : "text-ink/60"}`}>
+              {counts.map(({ p, n, max, custom }) => (
+                <span
+                  key={p}
+                  title={custom ? `${providerName(p)} has its own text` : `${providerName(p)} uses the main text`}
+                  className={`flex items-center gap-1.5 text-xs ${n > max ? "text-red-700" : "text-ink/60"}`}
+                >
                   <ProviderIcon provider={p} size={14} />
                   {n}/{max}
+                  {custom && <span className="text-goblin-800">·&nbsp;own</span>}
                 </span>
               ))}
             </div>
@@ -294,7 +366,7 @@ export default function Composer({
             <div className="rounded-lg border border-goblin-500/20 bg-goblin-500/[0.04] p-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-medium text-goblin-800">✨ AI assist</div>
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {QUICK.map((q) => (
+                {(activeTab === "all" ? QUICK : [`Adapt this for ${providerName(activeTab)}`, ...QUICK.filter((q) => !q.startsWith("Shorten"))]).map((q) => (
                   <button
                     key={q}
                     disabled={!!busy}
@@ -381,7 +453,7 @@ export default function Composer({
                   className="input"
                   maxLength={YOUTUBE_TITLE_MAX}
                   value={yt.title ?? ""}
-                  placeholder={defaultYouTubeTitle(content)}
+                  placeholder={defaultYouTubeTitle(effectiveText("youtube"))}
                   onChange={(e) => setYt({ ...yt, title: e.target.value.replace(/[<>]/g, "") })}
                 />
                 <p className="mt-1 text-xs text-ink/50">
@@ -550,7 +622,7 @@ export default function Composer({
                 </div>
               </div>
               <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-ink">
-                {content || <span className="text-ink/40">Your post will appear here…</span>}
+                {previewText || <span className="text-ink/40">Your post will appear here…</span>}
               </p>
               {media.length > 0 && (
                 <div className={`mt-3 grid gap-1 ${media.length > 1 ? "grid-cols-2" : ""}`}>
@@ -587,7 +659,7 @@ export default function Composer({
             <div className="space-y-2">
               <button
                 className="btn-primary w-full"
-                disabled={!!busy || blocked || !selected.length || (!content.trim() && !media.length)}
+                disabled={!!busy || blocked || !selected.length || (!hasText && !media.length)}
                 onClick={() => save("schedule")}
               >
                 {busy === "schedule" ? "Scheduling…" : post?.status === "scheduled" ? "Update schedule" : "Schedule"}
@@ -595,12 +667,12 @@ export default function Composer({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   className="btn-ghost"
-                  disabled={!!busy || blocked || !selected.length || (!content.trim() && !media.length)}
+                  disabled={!!busy || blocked || !selected.length || (!hasText && !media.length)}
                   onClick={() => confirm("Publish to the selected accounts right now?") && save("now")}
                 >
                   {busy === "now" ? "Posting…" : "Post now"}
                 </button>
-                <button className="btn-ghost" disabled={!!busy || (!content.trim() && !media.length)} onClick={() => save("draft")}>
+                <button className="btn-ghost" disabled={!!busy || (!hasText && !media.length)} onClick={() => save("draft")}>
                   {busy === "draft" ? "Saving…" : "Save draft"}
                 </button>
               </div>

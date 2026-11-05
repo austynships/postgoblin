@@ -16,9 +16,32 @@ export type YouTubeOptions = {
   thumbnailId?: string;
 };
 
+/** Every platform id (kept here so client code needn't import the providers). */
+export const PLATFORM_IDS = [
+  "x",
+  "bluesky",
+  "mastodon",
+  "linkedin",
+  "threads",
+  "facebook",
+  "instagram",
+  "youtube",
+  "tiktok",
+  "discord",
+  "telegram",
+] as const;
+export type PlatformId = (typeof PLATFORM_IDS)[number];
+
 export type PostOptions = {
   youtube?: YouTubeOptions;
+  /** Per-platform text that replaces the main content on that platform. */
+  text?: Partial<Record<PlatformId, string>>;
 };
+
+/** The text a platform actually gets: its own version, or the main content. */
+export function textFor(content: string, options: PostOptions | undefined, platform: string) {
+  return options?.text?.[platform as PlatformId] ?? content;
+}
 
 export const YOUTUBE_PRIVACY: YouTubePrivacy[] = ["public", "unlisted", "private"];
 export const YOUTUBE_TITLE_MAX = 100;
@@ -41,6 +64,15 @@ export function parseTags(input: string | string[] | undefined): string[] {
 /** Keeps only known fields with valid values. */
 export function sanitizeOptions(raw: unknown): PostOptions {
   const out: PostOptions = {};
+  const text = (raw as PostOptions | undefined)?.text;
+  if (text && typeof text === "object") {
+    const clean: PostOptions["text"] = {};
+    for (const p of PLATFORM_IDS) {
+      const v = text[p];
+      if (typeof v === "string" && v.trim()) clean[p] = v.trim().slice(0, 70_000);
+    }
+    if (Object.keys(clean).length) out.text = clean;
+  }
   const yt = (raw as PostOptions | undefined)?.youtube;
   if (yt && typeof yt === "object") {
     const clean: YouTubeOptions = {};

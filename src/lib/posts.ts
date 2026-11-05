@@ -4,7 +4,7 @@ import { id } from "./crypto";
 import { all, now, one, run, tx } from "./db";
 import { CHAR_LIMITS, countChars } from "./limits";
 import { getMedia, publicMedia, type PublicMedia } from "./media";
-import { YOUTUBE_THUMBNAIL_MAX_BYTES, sanitizeOptions, youtubeProblems, type PostOptions } from "./postOptions";
+import { YOUTUBE_THUMBNAIL_MAX_BYTES, sanitizeOptions, textFor, youtubeProblems, type PostOptions } from "./postOptions";
 import { getProvider } from "./providers";
 
 export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "partial" | "failed";
@@ -146,7 +146,8 @@ export async function getPost(userId: string, postId: string): Promise<PostView>
 async function validate(userId: string, input: PostInput) {
   const content = input.content?.trim() ?? "";
   const mediaIds = input.mediaIds ?? [];
-  if (!content && !mediaIds.length) throw new HttpError(400, "Post content is empty");
+  const options = sanitizeOptions(input.options);
+  if (!content && !mediaIds.length && !options.text) throw new HttpError(400, "Post content is empty");
   if (input.mode !== "draft" && !input.accountIds.length) {
     throw new HttpError(400, "Choose at least one account to publish to");
   }
@@ -155,7 +156,9 @@ async function validate(userId: string, input: PostInput) {
   const problems: string[] = [];
   for (const a of accounts) {
     const p = getProvider(a.provider);
-    const n = countChars(a.provider, content);
+    const text = textFor(content, options, a.provider);
+    if (!text && !media.length) problems.push(`${p.name}: the post has no text`);
+    const n = countChars(a.provider, text);
     if (n > CHAR_LIMITS[a.provider]) {
       problems.push(`${p.name} (${a.name}): ${n}/${CHAR_LIMITS[a.provider]} characters`);
     }
@@ -171,7 +174,6 @@ async function validate(userId: string, input: PostInput) {
   if (problems.length && input.mode !== "draft") {
     throw new HttpError(400, `Can't post to some platforms — ${problems.join("; ")}`);
   }
-  const options = sanitizeOptions(input.options);
   const thumbId = options.youtube?.thumbnailId;
   if (thumbId) {
     const [thumb] = await getMedia(userId, [thumbId]);

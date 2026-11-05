@@ -2,6 +2,14 @@
 
 import { useMemo, useRef, useState } from "react";
 import { CHAR_LIMITS, countChars } from "@/lib/limits";
+import {
+  YOUTUBE_TAGS_MAX_CHARS,
+  YOUTUBE_TITLE_MAX,
+  defaultYouTubeTitle,
+  parseTags,
+  type YouTubeOptions,
+  type YouTubePrivacy,
+} from "@/lib/postOptions";
 import { Avatar, Modal, ProviderIcon, StatusPill, request, type AccountView, type PostView, type ProviderInfo } from "./ui";
 
 export type ComposerSeed = { post?: PostView; at?: number };
@@ -53,6 +61,8 @@ export default function Composer({
   const [error, setError] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [progress, setProgress] = useState<number | null>(null);
+  const [yt, setYt] = useState<YouTubeOptions>(post?.options?.youtube ?? {});
+  const [ytTags, setYtTags] = useState((post?.options?.youtube?.tags ?? []).join(", "));
   const fileRef = useRef<HTMLInputElement>(null);
 
   const chosen = accounts.filter((a) => selected.includes(a.id));
@@ -73,7 +83,15 @@ export default function Composer({
     if (media.length > info.maxMedia) return [`${info.name} allows at most ${info.maxMedia} file${info.maxMedia > 1 ? "s" : ""}`];
     return [];
   });
-  const blocked = tooLong || mediaProblems.length > 0;
+  const hasYouTube = platforms.includes("youtube");
+  const tagsTooLong = parseTags(ytTags).join(",").length > YOUTUBE_TAGS_MAX_CHARS;
+  const ytProblems = !hasYouTube
+    ? []
+    : [
+        ...(typeof yt.madeForKids !== "boolean" ? ["YouTube: choose whether the video is made for kids"] : []),
+        ...(tagsTooLong ? [`YouTube tags must total ${YOUTUBE_TAGS_MAX_CHARS} characters or fewer`] : []),
+      ];
+  const blocked = tooLong || mediaProblems.length > 0 || ytProblems.length > 0;
 
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
@@ -146,6 +164,7 @@ export default function Composer({
       content,
       accountIds: selected,
       mediaIds: media.map((m) => m.id),
+      options: { ...post?.options, youtube: { ...yt, tags: parseTags(ytTags) } },
       mode,
       scheduledAt: mode === "schedule" ? new Date(when).getTime() : null,
     };
@@ -328,6 +347,87 @@ export default function Composer({
             </div>
           </div>
 
+          {/* YouTube settings */}
+          {hasYouTube && (
+            <fieldset disabled={!!locked} className="space-y-3 rounded-xl border border-ink/15 p-4">
+              <legend className="flex items-center gap-2 px-1 text-sm font-semibold">
+                <ProviderIcon provider="youtube" size={16} /> YouTube settings
+              </legend>
+              <div>
+                <label className="label" htmlFor="yt-title">Title</label>
+                <input
+                  id="yt-title"
+                  className="input"
+                  maxLength={YOUTUBE_TITLE_MAX}
+                  value={yt.title ?? ""}
+                  placeholder={defaultYouTubeTitle(content)}
+                  onChange={(e) => setYt({ ...yt, title: e.target.value.replace(/[<>]/g, "") })}
+                />
+                <p className="mt-1 text-xs text-ink/50">
+                  {(yt.title ?? "").length}/{YOUTUBE_TITLE_MAX}. Leave empty to use the first line of the post. The full post
+                  text becomes the description.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="yt-privacy">Visibility</label>
+                  <select
+                    id="yt-privacy"
+                    className="input"
+                    value={yt.privacy ?? "public"}
+                    onChange={(e) => setYt({ ...yt, privacy: e.target.value as YouTubePrivacy })}
+                  >
+                    <option value="public">Public</option>
+                    <option value="unlisted">Unlisted</option>
+                    <option value="private">Private</option>
+                  </select>
+                </div>
+                <div>
+                  <span className="label">Made for kids? <span className="text-red-700">*</span></span>
+                  <div className="flex gap-2" role="radiogroup" aria-label="Made for kids">
+                    {[
+                      [false, "No"],
+                      [true, "Yes"],
+                    ].map(([value, label]) => (
+                      <label
+                        key={String(value)}
+                        className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                          yt.madeForKids === value ? "border-goblin-600 bg-goblin-600/10 font-semibold" : "border-ink/15"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="yt-kids"
+                          className="sr-only"
+                          checked={yt.madeForKids === value}
+                          onChange={() => setYt({ ...yt, madeForKids: value as boolean })}
+                        />
+                        {label as string}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-ink/50">
+                US law (COPPA) requires saying whether a video is made for kids. Made-for-kids videos have comments and some
+                features turned off.
+              </p>
+              <div>
+                <label className="label" htmlFor="yt-tags">Tags</label>
+                <input
+                  id="yt-tags"
+                  className="input"
+                  value={ytTags}
+                  placeholder="cooking, recipes, quick dinner"
+                  onChange={(e) => setYtTags(e.target.value)}
+                />
+                <p className={`mt-1 text-xs ${tagsTooLong ? "text-red-700" : "text-ink/50"}`}>
+                  Separate with commas. {parseTags(ytTags).join(",").length}/{YOUTUBE_TAGS_MAX_CHARS} characters.
+                </p>
+              </div>
+            </fieldset>
+          )}
+
           {/* Delivery results */}
           {post && post.targets.some((t) => t.status !== "pending") && (
             <div>
@@ -407,6 +507,9 @@ export default function Composer({
             <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
               {mediaProblems.join(". ")}. Adjust the media or deselect those accounts.
             </p>
+          )}
+          {!locked && ytProblems.length > 0 && (
+            <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700">{ytProblems.join(". ")}.</p>
           )}
 
           {!locked && (

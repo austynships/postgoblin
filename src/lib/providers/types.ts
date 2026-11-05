@@ -1,3 +1,5 @@
+import type { PostOptions } from "../postOptions";
+
 export type ProviderId =
   | "x"
   | "bluesky"
@@ -43,7 +45,7 @@ export type MediaFile = {
   size: number;
 };
 
-export type PublishInput = { text: string; media: MediaFile[] };
+export type PublishInput = { text: string; media: MediaFile[]; options?: PostOptions };
 export type PublishResult = { id: string; url?: string };
 
 /** An account as handed to a provider at publish time. */

@@ -4,6 +4,7 @@ import { id } from "./crypto";
 import { all, now, one, run, tx } from "./db";
 import { CHAR_LIMITS, countChars } from "./limits";
 import { getMedia, publicMedia, type PublicMedia } from "./media";
+import { sanitizeOptions, youtubeProblems, type PostOptions } from "./postOptions";
 import { getProvider } from "./providers";
 
 export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "partial" | "failed";
@@ -12,6 +13,7 @@ export type PostView = {
   id: string;
   content: string;
   media: PublicMedia[];
+  options: PostOptions;
   status: PostStatus;
   scheduledAt: number | null;
   publishedAt: number | null;
@@ -35,6 +37,7 @@ type PostRow = {
   user_id: string;
   content: string;
   media: string;
+  options: string;
   status: PostStatus;
   scheduled_at: number | null;
   published_at: number | null;
@@ -47,6 +50,8 @@ export type PostInput = {
   content: string;
   accountIds: string[];
   mediaIds?: string[];
+  /** Per-platform settings (e.g. YouTube title, privacy, made for kids). */
+  options?: PostOptions;
   /** draft = save only, schedule = publish at scheduledAt, now = publish immediately */
   mode: "draft" | "schedule" | "now";
   scheduledAt?: number | null;
@@ -71,6 +76,7 @@ async function hydrate(userId: string, rows: PostRow[]): Promise<PostView[]> {
         id: r.id,
         content: r.content,
         media,
+        options: sanitizeOptions(JSON.parse(r.options || "{}")),
         status: r.status,
         scheduledAt: r.scheduled_at,
         publishedAt: r.published_at,
@@ -155,7 +161,12 @@ async function validate(userId: string, input: PostInput) {
   if (problems.length && input.mode !== "draft") {
     throw new HttpError(400, `Can't post to some platforms — ${problems.join("; ")}`);
   }
-  return { content, mediaIds };
+  const options = sanitizeOptions(input.options);
+  if (input.mode !== "draft" && accounts.some((a) => a.provider === "youtube")) {
+    const yt = youtubeProblems(options);
+    if (yt.length) throw new HttpError(400, yt.join("; "));
+  }
+  return { content, mediaIds, options };
 }
 
 function statusFor(mode: PostInput["mode"]): PostStatus {
@@ -170,15 +181,15 @@ function targetInserts(postId: string, accountIds: string[]): [string, unknown[]
 }
 
 export async function createPost(userId: string, input: PostInput, createdBy: "user" | "agent" = "user"): Promise<PostView> {
-  const { content, mediaIds } = await validate(userId, input);
+  const { content, mediaIds, options } = await validate(userId, input);
   const postId = id("post_");
   const t = now();
   const scheduledAt = input.mode === "now" ? t : (input.scheduledAt ?? null);
   await tx([
     [
-      `INSERT INTO posts (id, user_id, content, media, status, scheduled_at, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [postId, userId, content, JSON.stringify(mediaIds), statusFor(input.mode), scheduledAt, createdBy, t, t],
+      `INSERT INTO posts (id, user_id, content, media, options, status, scheduled_at, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [postId, userId, content, JSON.stringify(mediaIds), JSON.stringify(options), statusFor(input.mode), scheduledAt, createdBy, t, t],
     ],
     ...targetInserts(postId, input.accountIds),
   ]);
@@ -194,16 +205,17 @@ export async function updatePost(userId: string, postId: string, patch: Partial<
     content: patch.content ?? existing.content,
     accountIds: patch.accountIds ?? existing.targets.map((t) => t.accountId),
     mediaIds: patch.mediaIds ?? existing.media.map((m) => m.id),
+    options: patch.options ?? existing.options,
     mode: patch.mode ?? (existing.status === "draft" ? "draft" : "schedule"),
     scheduledAt: patch.scheduledAt !== undefined ? patch.scheduledAt : existing.scheduledAt,
   };
-  const { content, mediaIds } = await validate(userId, merged);
+  const { content, mediaIds, options } = await validate(userId, merged);
   const scheduledAt = merged.mode === "now" ? now() : (merged.scheduledAt ?? null);
   // Targets are reset: a failed post that is rescheduled gets fresh attempts.
   await tx([
     [
-      "UPDATE posts SET content = ?, media = ?, status = ?, scheduled_at = ?, updated_at = ? WHERE id = ?",
-      [content, JSON.stringify(mediaIds), statusFor(merged.mode), scheduledAt, now(), postId],
+      "UPDATE posts SET content = ?, media = ?, options = ?, status = ?, scheduled_at = ?, updated_at = ? WHERE id = ?",
+      [content, JSON.stringify(mediaIds), JSON.stringify(options), statusFor(merged.mode), scheduledAt, now(), postId],
     ],
     ["DELETE FROM post_targets WHERE post_id = ?", [postId]],
     ...targetInserts(postId, merged.accountIds),

@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { loadAccountContext, markAccount, updateAccountSecrets } from "./accounts";
 import { all, now, one, run } from "./db";
 import { getMedia } from "./media";
+import { sanitizeOptions } from "./postOptions";
 import { getProvider } from "./providers";
 import { ProviderError } from "./providers/types";
 
@@ -23,8 +24,8 @@ async function publishTarget(target: DueTarget) {
   if (!claimed) return;
   await run("UPDATE posts SET status = 'publishing', updated_at = ? WHERE id = ?", [now(), target.post_id]);
 
-  const post = await one<{ user_id: string; content: string; media: string }>(
-    "SELECT user_id, content, media FROM posts WHERE id = ?",
+  const post = await one<{ user_id: string; content: string; media: string; options: string }>(
+    "SELECT user_id, content, media, options FROM posts WHERE id = ?",
     [target.post_id],
   );
   const attempts = target.attempts + 1;
@@ -45,7 +46,11 @@ async function publishTarget(target: DueTarget) {
     }
 
     const media = await getMedia(post.user_id, JSON.parse(post.media));
-    const result = await provider.publish(account, { text: post.content, media });
+    const result = await provider.publish(account, {
+      text: post.content,
+      media,
+      options: sanitizeOptions(JSON.parse(post.options || "{}")),
+    });
     await run(
       `UPDATE post_targets SET status = 'published', remote_id = ?, remote_url = ?, error = NULL, attempts = ?
        WHERE id = ?`,

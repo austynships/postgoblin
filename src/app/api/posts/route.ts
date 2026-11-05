@@ -26,6 +26,7 @@ export const POST = handler(async (req: Request) => {
     content: String(body.content ?? ""),
     accountIds: body.accountIds ?? [],
     mediaIds: body.mediaIds ?? [],
+    options: body.options,
     mode: body.mode,
     scheduledAt: body.scheduledAt ?? null,
   });

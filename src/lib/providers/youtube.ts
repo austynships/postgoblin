@@ -1,16 +1,12 @@
 import { pkceChallenge } from "../crypto";
 import { api, env, form, readMedia, requireEnv } from "./http";
+import { defaultYouTubeTitle } from "../postOptions";
 import { ProviderError, type Provider } from "./types";
 
-// YouTube Data API v3 with Google OAuth. One video per post: the first line of
-// the post becomes the title, the full text the description.
+// YouTube Data API v3 with Google OAuth. One video per post. Title, privacy,
+// made-for-kids and tags come from the post's YouTube settings; the full text
+// is the description.
 const SCOPES = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly";
-
-function title(text: string) {
-  const first = text.split("\n").find((l) => l.trim())?.trim() ?? "";
-  const clean = first.replace(/[<>]/g, ""); // YouTube rejects angle brackets in titles
-  return (clean || "New video").slice(0, 100);
-}
 
 async function token(params: Record<string, string>) {
   return api(
@@ -86,7 +82,11 @@ export const youtube: Provider = {
     };
   },
 
-  async publish(account, { text, media }) {
+  async publish(account, { text, media, options }) {
+    const yt = options?.youtube ?? {};
+    if (typeof yt.madeForKids !== "boolean") {
+      throw new ProviderError("YouTube: choose whether the video is made for kids, then retry", false);
+    }
     const video = media.find((m) => m.mime.startsWith("video/"));
     if (!video || media.length !== 1) throw new ProviderError("YouTube posts need exactly one video", false);
     const auth = { Authorization: `Bearer ${(account.secrets as any).accessToken}` };
@@ -103,10 +103,15 @@ export const youtube: Provider = {
           "X-Upload-Content-Length": String(video.size),
         },
         body: JSON.stringify({
-          snippet: { title: title(text), description: text.slice(0, 5000), categoryId: "22" },
+          snippet: {
+            title: yt.title || defaultYouTubeTitle(text),
+            description: text.slice(0, 5000),
+            categoryId: "22",
+            ...(yt.tags?.length ? { tags: yt.tags } : {}),
+          },
           status: {
-            privacyStatus: env("YOUTUBE_PRIVACY") ?? "public",
-            selfDeclaredMadeForKids: false,
+            privacyStatus: yt.privacy ?? env("YOUTUBE_PRIVACY") ?? "public",
+            selfDeclaredMadeForKids: yt.madeForKids,
           },
         }),
       },

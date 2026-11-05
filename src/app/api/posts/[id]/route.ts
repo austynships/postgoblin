@@ -19,6 +19,7 @@ export const PATCH = handler(async (req: Request, { params }: Ctx) => {
     content: body.content,
     accountIds: body.accountIds,
     mediaIds: body.mediaIds,
+    options: body.options,
     mode: body.mode,
     scheduledAt: body.scheduledAt,
   });

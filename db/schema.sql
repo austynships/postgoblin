@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS posts (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   media TEXT NOT NULL DEFAULT '[]',
+  options TEXT NOT NULL DEFAULT '{}', -- per-platform settings, e.g. {"youtube":{"title":…}}
   status TEXT NOT NULL,
   scheduled_at BIGINT,
   published_at BIGINT,
@@ -56,6 +57,8 @@ CREATE TABLE IF NOT EXISTS posts (
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL
 );
+-- Added after launch; safe to re-run.
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS options TEXT NOT NULL DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS idx_posts_due ON posts (status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts (user_id);
 

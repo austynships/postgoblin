@@ -36,7 +36,37 @@ export type PostOptions = {
   youtube?: YouTubeOptions;
   /** Per-platform text that replaces the main content on that platform. */
   text?: Partial<Record<PlatformId, string>>;
+  /** Posted as a reply/comment right after the post, where the platform allows it. */
+  firstComment?: string;
 };
+
+/** Platforms that post each `---` separated part as a reply to the previous one. */
+export const THREAD_PLATFORMS: readonly PlatformId[] = ["x", "bluesky", "mastodon", "threads"];
+/** Platforms where PostGoblins can add a first comment. */
+export const COMMENT_PLATFORMS: readonly PlatformId[] = [...THREAD_PLATFORMS, "linkedin", "facebook", "instagram"];
+/** Comment length limits where they differ from the post limit. */
+export const COMMENT_LIMITS: Partial<Record<PlatformId, number>> = { linkedin: 1250, facebook: 8000, instagram: 2200 };
+export const MAX_THREAD_PARTS = 25;
+
+const THREAD_BREAK = /^[ \t]*-{3,}[ \t]*$/m;
+
+/** Splits text on lines that contain only `---`. Text without a break is one part. */
+export function splitThread(text: string): string[] {
+  if (!THREAD_BREAK.test(text)) return [text];
+  return text
+    .split(new RegExp(THREAD_BREAK.source, "gm"))
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+/** The posts a platform publishes: thread parts, or everything joined into one post. */
+export function partsFor(platform: string, text: string): string[] {
+  const parts = splitThread(text);
+  if (THREAD_PLATFORMS.includes(platform as PlatformId)) return parts;
+  return [parts.join("\n\n")];
+}
+
+export const supportsComments = (platform: string) => COMMENT_PLATFORMS.includes(platform as PlatformId);
 
 /** The text a platform actually gets: its own version, or the main content. */
 export function textFor(content: string, options: PostOptions | undefined, platform: string) {
@@ -73,6 +103,8 @@ export function sanitizeOptions(raw: unknown): PostOptions {
     }
     if (Object.keys(clean).length) out.text = clean;
   }
+  const firstComment = (raw as PostOptions | undefined)?.firstComment;
+  if (typeof firstComment === "string" && firstComment.trim()) out.firstComment = firstComment.trim().slice(0, 10_000);
   const yt = (raw as PostOptions | undefined)?.youtube;
   if (yt && typeof yt === "object") {
     const clean: YouTubeOptions = {};

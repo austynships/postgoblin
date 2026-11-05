@@ -17,7 +17,7 @@ export const threads: Provider = {
     const params = new URLSearchParams({
       client_id: requireEnv("THREADS_APP_ID"),
       redirect_uri: redirectUri,
-      scope: "threads_basic,threads_content_publish",
+      scope: "threads_basic,threads_content_publish,threads_manage_replies",
       response_type: "code",
       state,
     });
@@ -110,6 +110,19 @@ export const threads: Provider = {
       { method: "POST", body: form({ creation_id: container.id, access_token: token }) },
       "Threads publish",
     );
+    const info = await api(`${GRAPH}/${published.id}?fields=permalink&access_token=${token}`, {}, "Threads permalink").catch(
+      () => ({}) as any,
+    );
+    return { id: published.id, url: info.permalink };
+  },
+
+  async reply(account, { text, parent }) {
+    const token = (account.secrets as any).accessToken as string;
+    const call = (path: string, params: Record<string, string>, label: string) =>
+      api(`${GRAPH}/${path}`, { method: "POST", body: form({ ...params, access_token: token }) }, label);
+    const container = await call("me/threads", { media_type: "TEXT", text, reply_to_id: parent.id }, "Threads reply");
+    await sleep(3_000); // Meta recommends a short wait before publishing a container
+    const published = await call("me/threads_publish", { creation_id: container.id }, "Threads reply publish");
     const info = await api(`${GRAPH}/${published.id}?fields=permalink&access_token=${token}`, {}, "Threads permalink").catch(
       () => ({}) as any,
     );

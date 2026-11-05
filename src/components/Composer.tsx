@@ -6,8 +6,13 @@ import {
   YOUTUBE_TAGS_MAX_CHARS,
   YOUTUBE_TITLE_MAX,
   defaultYouTubeTitle,
+  COMMENT_LIMITS,
+  THREAD_PLATFORMS,
   parseTags,
+  partsFor,
+  supportsComments,
   textFor,
+  type PlatformId,
   type YouTubeOptions,
   type YouTubePrivacy,
 } from "@/lib/postOptions";
@@ -70,6 +75,9 @@ export default function Composer({
   const [thumb, setThumb] = useState<Media | null>(post?.thumbnail ?? null);
   const thumbRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const [firstComment, setFirstComment] = useState(post?.options?.firstComment ?? "");
+  const [showComment, setShowComment] = useState(!!post?.options?.firstComment);
 
   const chosen = accounts.filter((a) => selected.includes(a.id));
   const platforms = [...new Set(chosen.map((a) => a.provider))];
@@ -77,10 +85,34 @@ export default function Composer({
   const customized = (p: string) => texts[p] !== undefined && texts[p].trim() !== "";
   /** What each platform will actually get. */
   const effectiveText = (p: string) => (customized(p) ? texts[p] : content);
-  const counts = platforms.map((p) => ({ p, n: countChars(p, effectiveText(p)), max: CHAR_LIMITS[p], custom: customized(p) }));
+  const counts = platforms.map((p) => {
+    const parts = partsFor(p, effectiveText(p));
+    const n = Math.max(0, ...parts.map((part) => countChars(p, part)));
+    return { p, n, max: CHAR_LIMITS[p], custom: customized(p), parts: parts.length };
+  });
+  const threadPlatforms = platforms.filter((p) => THREAD_PLATFORMS.includes(p as PlatformId));
+  const commentPlatforms = platforms.filter(supportsComments);
+  const commentCounts = firstComment.trim()
+    ? commentPlatforms.map((p) => ({ p, n: countChars(p, firstComment.trim()), max: COMMENT_LIMITS[p as PlatformId] ?? CHAR_LIMITS[p] }))
+    : [];
+  const commentTooLong = commentCounts.filter((c) => c.n > c.max);
   const editorValue = activeTab === "all" ? content : (texts[activeTab] ?? content);
   const setEditorValue = (v: string) =>
     activeTab === "all" ? setContent(v) : setTexts((cur) => ({ ...cur, [activeTab]: v }));
+  function insertThreadBreak() {
+    const el = editorRef.current;
+    const value = editorValue;
+    const at = el ? el.selectionStart : value.length;
+    const before = value.slice(0, at).replace(/\s+$/, "");
+    const after = value.slice(at).replace(/^\s+/, "");
+    const next = `${before}\n\n---\n\n${after}`;
+    setEditorValue(next);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const pos = before.length + 7;
+      el?.setSelectionRange(pos, pos);
+    });
+  }
   const resetTab = (p: string) =>
     setTexts((cur) => {
       const next = { ...cur };
@@ -88,7 +120,7 @@ export default function Composer({
       return next;
     });
   const hasText = !!content.trim() || platforms.some(customized);
-  const tooLong = counts.some((c) => c.n > c.max);
+  const tooLong = counts.some((c) => c.n > c.max) || commentTooLong.length > 0;
   // The most restrictive limit among selected platforms (10 when none are selected).
   const maxMedia = Math.min(10, ...platforms.map((p) => providers.find((x) => x.id === p)?.maxMedia ?? 10));
   const providerName = (id: string) => providers.find((p) => p.id === id)?.name ?? id;
@@ -206,6 +238,7 @@ export default function Composer({
       options: {
         ...post?.options,
         text: Object.fromEntries(platforms.filter(customized).map((p) => [p, texts[p]])),
+        firstComment: firstComment.trim() || undefined,
         youtube: { ...yt, tags: parseTags(ytTags), thumbnailId: thumb?.id } },
       mode,
       scheduledAt: mode === "schedule" ? new Date(when).getTime() : null,
@@ -239,6 +272,8 @@ export default function Composer({
 
   const previewAccount = (activeTab !== "all" && chosen.find((a) => a.provider === activeTab)) || chosen[0];
   const previewText = previewAccount ? effectiveText(previewAccount.provider) : content;
+  const previewParts = previewAccount ? partsFor(previewAccount.provider, previewText) : [previewText];
+  const previewComment = previewAccount && supportsComments(previewAccount.provider) ? firstComment.trim() : "";
   const QUICK = useMemo(
     () => ["Make it punchier", "Shorten to fit every platform", "Add 2–3 relevant hashtags", "Fix grammar", "Write a hook-first version"],
     [],
@@ -320,6 +355,7 @@ export default function Composer({
               </div>
             ) : null}
             <textarea
+              ref={editorRef}
               className="input min-h-[180px] resize-y leading-relaxed"
               value={editorValue}
               disabled={!!locked}
@@ -347,19 +383,92 @@ export default function Composer({
               </div>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              {counts.map(({ p, n, max, custom }) => (
+              {counts.map(({ p, n, max, custom, parts }) => (
                 <span
                   key={p}
-                  title={custom ? `${providerName(p)} has its own text` : `${providerName(p)} uses the main text`}
+                  title={`${custom ? `${providerName(p)} has its own text` : `${providerName(p)} uses the main text`}${
+                    parts > 1 ? `, posted as a ${parts}-part thread (longest part shown)` : ""
+                  }`}
                   className={`flex items-center gap-1.5 text-xs ${n > max ? "text-red-700" : "text-ink/60"}`}
                 >
                   <ProviderIcon provider={p} size={14} />
+                  {parts > 1 && <span>{parts} parts ·</span>}
                   {n}/{max}
                   {custom && <span className="text-goblin-800">·&nbsp;own</span>}
                 </span>
               ))}
+              {!locked && threadPlatforms.length > 0 && (
+                <button
+                  type="button"
+                  onClick={insertThreadBreak}
+                  className="ml-auto rounded-full border border-ink/15 px-2.5 py-0.5 text-xs text-ink/70 hover:border-ink/30 hover:text-ink"
+                  title="Insert a --- line: everything after it becomes the next post in the thread"
+                >
+                  + Thread break
+                </button>
+              )}
             </div>
+            {threadPlatforms.length > 0 && /^[ \t]*-{3,}[ \t]*$/m.test(editorValue) && (
+              <p className="mt-1.5 text-xs text-ink/50">
+                Lines with only <code>---</code> split this into a thread on{" "}
+                {threadPlatforms.map(providerName).join(", ")}
+                {platforms.length > threadPlatforms.length ? "; other platforms get it as one post" : ""}.
+              </p>
+            )}
           </div>
+
+          {/* First comment */}
+          {commentPlatforms.length > 0 && (showComment || !locked) && (
+            <div>
+              {!showComment ? (
+                <button type="button" className="text-sm text-goblin-800 hover:underline" onClick={() => setShowComment(true)}>
+                  + Add a first comment
+                </button>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <label className="label" htmlFor="first-comment">First comment</label>
+                    {!locked && (
+                      <button
+                        type="button"
+                        className="text-xs text-ink/50 hover:text-ink"
+                        onClick={() => {
+                          setFirstComment("");
+                          setShowComment(false);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    id="first-comment"
+                    className="input min-h-[72px] resize-y leading-relaxed"
+                    value={firstComment}
+                    disabled={!!locked}
+                    onChange={(e) => setFirstComment(e.target.value)}
+                    placeholder="e.g. Link in the comments: https://…"
+                  />
+                  <p className="mt-1 text-xs text-ink/50">
+                    Posted right after the post on {commentPlatforms.map(providerName).join(", ")}
+                    {threadPlatforms.length > 0 ? " (after the last part of a thread)" : ""}.
+                    {platforms.length > commentPlatforms.length &&
+                      ` Not supported on ${platforms.filter((p) => !supportsComments(p)).map(providerName).join(", ")}.`}
+                  </p>
+                  {commentCounts.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-3">
+                      {commentCounts.map(({ p, n, max }) => (
+                        <span key={p} className={`flex items-center gap-1.5 text-xs ${n > max ? "text-red-700" : "text-ink/60"}`}>
+                          <ProviderIcon provider={p} size={14} />
+                          {n}/{max}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* AI assist */}
           {!locked && aiEnabled && (
@@ -622,7 +731,7 @@ export default function Composer({
                 </div>
               </div>
               <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-ink">
-                {previewText || <span className="text-ink/40">Your post will appear here…</span>}
+                {previewParts[0] || <span className="text-ink/40">Your post will appear here…</span>}
               </p>
               {media.length > 0 && (
                 <div className={`mt-3 grid gap-1 ${media.length > 1 ? "grid-cols-2" : ""}`}>
@@ -636,14 +745,29 @@ export default function Composer({
                   )}
                 </div>
               )}
+              {[...previewParts.slice(1), ...(previewComment ? [previewComment] : [])].map((part, i, all) => (
+                <div key={i} className="mt-3 border-l-2 border-ink/15 pl-3">
+                  <div className="mb-0.5 text-[11px] text-ink/45">
+                    {previewComment && i === all.length - 1
+                      ? "First comment"
+                      : `${i + 2}/${previewParts.length}`}
+                  </div>
+                  <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-ink">{part}</p>
+                </div>
+              ))}
             </div>
           </div>
 
           {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm break-words text-red-700">{error}</p>}
           {tooLong && !error && (
             <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
-              Too long for {counts.filter((c) => c.n > c.max).map((c) => providerName(c.p)).join(", ")}. Shorten it or
-              deselect those accounts.
+              {counts.some((c) => c.n > c.max) &&
+                `Too long for ${counts
+                  .filter((c) => c.n > c.max)
+                  .map((c) => providerName(c.p) + (c.parts > 1 ? " (a thread part)" : ""))
+                  .join(", ")}. `}
+              {commentTooLong.length > 0 && `First comment is too long for ${commentTooLong.map((c) => providerName(c.p)).join(", ")}. `}
+              Shorten it, add a thread break, or deselect those accounts.
             </p>
           )}
           {!locked && mediaProblems.length > 0 && (

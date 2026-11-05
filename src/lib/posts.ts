@@ -4,7 +4,18 @@ import { id } from "./crypto";
 import { all, now, one, run, tx } from "./db";
 import { CHAR_LIMITS, countChars } from "./limits";
 import { getMedia, publicMedia, type PublicMedia } from "./media";
-import { YOUTUBE_THUMBNAIL_MAX_BYTES, sanitizeOptions, textFor, youtubeProblems, type PostOptions } from "./postOptions";
+import {
+  COMMENT_LIMITS,
+  MAX_THREAD_PARTS,
+  YOUTUBE_THUMBNAIL_MAX_BYTES,
+  partsFor,
+  sanitizeOptions,
+  supportsComments,
+  textFor,
+  youtubeProblems,
+  type PlatformId,
+  type PostOptions,
+} from "./postOptions";
 import { getProvider } from "./providers";
 
 export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "partial" | "failed";
@@ -156,11 +167,21 @@ async function validate(userId: string, input: PostInput) {
   const problems: string[] = [];
   for (const a of accounts) {
     const p = getProvider(a.provider);
-    const text = textFor(content, options, a.provider);
-    if (!text && !media.length) problems.push(`${p.name}: the post has no text`);
-    const n = countChars(a.provider, text);
-    if (n > CHAR_LIMITS[a.provider]) {
-      problems.push(`${p.name} (${a.name}): ${n}/${CHAR_LIMITS[a.provider]} characters`);
+    const parts = partsFor(a.provider, textFor(content, options, a.provider));
+    const max = CHAR_LIMITS[a.provider];
+    if (!parts.join("").trim() && !media.length) problems.push(`${p.name}: the post has no text`);
+    if (parts.length > MAX_THREAD_PARTS) problems.push(`${p.name}: a thread can have at most ${MAX_THREAD_PARTS} parts`);
+    parts.forEach((part, i) => {
+      const n = countChars(a.provider, part);
+      if (n > max) {
+        const which = parts.length > 1 ? ` part ${i + 1}` : "";
+        problems.push(`${p.name} (${a.name})${which}: ${n}/${max} characters`);
+      }
+    });
+    if (options.firstComment && supportsComments(a.provider)) {
+      const limit = COMMENT_LIMITS[a.provider as PlatformId] ?? max;
+      const n = countChars(a.provider, options.firstComment);
+      if (n > limit) problems.push(`${p.name}: first comment is ${n}/${limit} characters`);
     }
     if (media.length > p.maxMedia) problems.push(`${p.name}: at most ${p.maxMedia} media file${p.maxMedia > 1 ? "s" : ""}`);
     const videos = media.filter((m) => m.mime.startsWith("video/")).length;

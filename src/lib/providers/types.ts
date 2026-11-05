@@ -53,7 +53,21 @@ export type PublishInput = {
   thumbnail?: MediaFile;
 };
 /** `warning`: published, but something optional (e.g. a thumbnail) didn't apply. */
-export type PublishResult = { id: string; url?: string; warning?: string };
+export type PublishResult = {
+  id: string;
+  url?: string;
+  warning?: string;
+  /** Provider-specific data needed to reply later (e.g. Bluesky's uri + cid). */
+  ref?: Record<string, string>;
+};
+
+export type ReplyInput = {
+  text: string;
+  /** The post being replied to (the previous thread part, or the main post). */
+  parent: PublishResult;
+  /** The first post of the thread. */
+  root: PublishResult;
+};
 
 /** An account as handed to a provider at publish time. */
 export type AccountContext = {
@@ -103,6 +117,8 @@ export interface Provider {
   /** Return refreshed secrets/expiry when the token is close to expiring. */
   refresh?(account: AccountContext): Promise<{ secrets: Record<string, unknown>; expiresAt?: number | null } | null>;
   publish(account: AccountContext, input: PublishInput): Promise<PublishResult>;
+  /** Thread parts and first comments: post `text` as a reply/comment under `parent`. */
+  reply?(account: AccountContext, input: ReplyInput): Promise<PublishResult>;
 }
 
 export class ProviderError extends Error {

@@ -8,7 +8,7 @@ import { publicMedia, getMedia } from "./media";
 import { createPost, deletePost, getPost, listPosts, retryFailed, updatePost, type PostStatus, type PostView } from "./posts";
 import { publishSoon } from "./scheduler";
 import { isoInZone, parseIsoWithOffset, zonedToEpoch } from "./time";
-import { PLATFORM_IDS, textFor, type PostOptions, type YouTubeOptions } from "./postOptions";
+import { PLATFORM_IDS, partsFor, textFor, type PostOptions, type YouTubeOptions } from "./postOptions";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type Tool = Anthropic.Beta.Messages.BetaTool;
@@ -46,6 +46,7 @@ How you work:
 - Write native-sounding copy for each platform and respect character limits: ${Object.entries(CHAR_LIMITS)
   .map(([k, v]) => `${k} ${v}`)
   .join(", ")}. When platforms need different wording (e.g. a short X/Bluesky version and a longer LinkedIn one), keep one post and use platform_text to give those platforms their own text; content is used everywhere else. Check each target's chars in the result.
+- Threads: on X, Bluesky, Mastodon and Threads, a line containing only --- splits the text into a thread (each part is a reply to the previous one, each within the character limit); other platforms get the parts joined into one post. Use first_comment for a comment posted right after the post (X, Bluesky, Mastodon, Threads, LinkedIn, Facebook, Instagram), e.g. a link that would hurt reach in the main post.
 - Media rules: Instagram posts need at least one photo or video; YouTube and TikTok posts need exactly one video (set the YouTube title/privacy/tags/thumbnail with the youtube parameter; a thumbnail is an uploaded image, not part of media_ids). Before scheduling or posting to YouTube, always ask the user whether the video is made for kids (a legal requirement; never guess) and pass youtube.made_for_kids. Use list_media to find uploaded files; if the user hasn't uploaded what a platform needs, say so instead of creating a post that will fail.
 - Times: every user message starts with a <context> block giving the current time and the user's timezone. Interpret times like "tomorrow at 9" in that timezone, and always pass scheduled_at as ISO-8601 with an explicit offset. Use find_open_slots when the user wants you to pick good times.
 - For a content calendar or campaign, schedule the whole series in one go, spaced sensibly, then summarise it as a short list (local time, platforms, first words of each post).
@@ -99,6 +100,10 @@ const tools: Tool[] = [
         mode: { type: "string", enum: ["draft", "schedule", "now"] },
         scheduled_at: { type: "string", description: 'Required when mode is "schedule". ISO-8601 with offset.' },
         media_ids: { type: "array", items: { type: "string" }, description: "Ids from list_media." },
+        first_comment: {
+          type: "string",
+          description: "Optional comment posted right after the post where supported. On update, an empty string removes it.",
+        },
         platform_text: {
           type: "object",
           description:
@@ -139,6 +144,10 @@ const tools: Tool[] = [
         mode: { type: "string", enum: ["draft", "schedule", "now"] },
         scheduled_at: { type: "string", description: "ISO-8601 with offset" },
         media_ids: { type: "array", items: { type: "string" } },
+        first_comment: {
+          type: "string",
+          description: "Optional comment posted right after the post where supported. On update, an empty string removes it.",
+        },
         platform_text: {
           type: "object",
           description:
@@ -226,8 +235,9 @@ export const mcpTools: Tool[] = [
 
 /** Agent tool input (snake_case) → stored options, merged over any existing ones. */
 function buildOptions(input: any, existing: PostOptions = {}): PostOptions | undefined {
-  if (!input.youtube && !input.platform_text) return undefined;
+  if (!input.youtube && !input.platform_text && input.first_comment === undefined) return undefined;
   const out: PostOptions = { ...existing };
+  if (input.first_comment !== undefined) out.firstComment = input.first_comment || undefined;
   if (input.platform_text && typeof input.platform_text === "object") {
     const text: Record<string, string> = { ...existing.text };
     for (const [k, v] of Object.entries(input.platform_text)) {
@@ -259,6 +269,7 @@ function summarizePost(p: PostView, tz: string) {
     content: p.content,
     media: p.media.map((m) => m.name),
     ...(p.options.text ? { platform_text: p.options.text } : {}),
+    ...(p.options.firstComment ? { first_comment: p.options.firstComment } : {}),
     ...(p.options.youtube ? { youtube: p.options.youtube } : {}),
     created_by: p.createdBy,
     targets: p.targets.map((t) => ({
@@ -268,7 +279,9 @@ function summarizePost(p: PostView, tz: string) {
       status: t.status,
       url: t.remoteUrl,
       error: t.error,
-      chars: `${countChars(t.provider, textFor(p.content, p.options, t.provider))}/${CHAR_LIMITS[t.provider]}`,
+      chars: partsFor(t.provider, textFor(p.content, p.options, t.provider))
+        .map((part) => `${countChars(t.provider, part)}/${CHAR_LIMITS[t.provider]}`)
+        .join(" + "),
     })),
   };
 }
@@ -339,7 +352,7 @@ export async function runTool(
     }
     case "update_post": {
       const options =
-        input.youtube || input.platform_text ? buildOptions(input, (await getPost(user.id, input.post_id)).options) : undefined;
+        input.youtube || input.platform_text || input.first_comment !== undefined ? buildOptions(input, (await getPost(user.id, input.post_id)).options) : undefined;
       const post = await updatePost(user.id, input.post_id, {
         options,
         content: input.content,

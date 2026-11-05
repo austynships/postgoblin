@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { loadAccountContext, markAccount, updateAccountSecrets } from "./accounts";
 import { all, now, one, run } from "./db";
 import { getMedia } from "./media";
-import { sanitizeOptions, textFor } from "./postOptions";
+import { partsFor, sanitizeOptions, supportsComments, textFor } from "./postOptions";
 import { getProvider } from "./providers";
 import { ProviderError } from "./providers/types";
 
@@ -49,12 +49,28 @@ async function publishTarget(target: DueTarget) {
     const options = sanitizeOptions(JSON.parse(post.options || "{}"));
     const thumbId = account.provider === "youtube" ? options.youtube?.thumbnailId : undefined;
     const thumbnail = thumbId ? (await getMedia(post.user_id, [thumbId]).catch(() => []))[0] : undefined;
-    const result = await provider.publish(account, {
-      text: textFor(post.content, options, account.provider),
-      media,
-      options,
-      thumbnail,
-    });
+    const parts = partsFor(account.provider, textFor(post.content, options, account.provider));
+    const result = await provider.publish(account, { text: parts[0] ?? "", media, options, thumbnail });
+
+    // Thread parts, then the first comment. The main post is already live, so a
+    // failure here becomes a warning rather than a failed (and re-posted) target.
+    const followUps = parts.slice(1).map((text, i) => ({ text, label: `thread part ${i + 2}` }));
+    if (options.firstComment && supportsComments(account.provider)) {
+      followUps.push({ text: options.firstComment, label: "first comment" });
+    }
+    const warnings = result.warning ? [result.warning] : [];
+    if (followUps.length && provider.reply) {
+      let parent = result;
+      for (const f of followUps) {
+        try {
+          parent = await provider.reply(account, { text: f.text, parent, root: result });
+        } catch (err) {
+          warnings.push(`Posted, but the ${f.label} failed: ${(err as Error).message}`);
+          break;
+        }
+      }
+    }
+    result.warning = warnings.join(" ") || undefined;
     await run(
       `UPDATE post_targets SET status = 'published', remote_id = ?, remote_url = ?, error = ?, attempts = ?
        WHERE id = ?`,

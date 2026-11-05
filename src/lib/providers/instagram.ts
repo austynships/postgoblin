@@ -8,7 +8,7 @@ import { ProviderError, type MediaFile, type Provider } from "./types";
 // FACEBOOK_APP_SECRET) with its own login configuration (INSTAGRAM_CONFIG_ID).
 const version = () => env("FACEBOOK_GRAPH_VERSION") ?? "v23.0";
 const graph = () => `https://graph.facebook.com/${version()}`;
-const SCOPES = "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management";
+const SCOPES = "instagram_basic,instagram_content_publish,instagram_manage_comments,pages_show_list,pages_read_engagement,business_management";
 
 const isVideo = (m: MediaFile) => m.mime.startsWith("video/");
 
@@ -144,5 +144,15 @@ export const instagram: Provider = {
       () => ({}) as any,
     );
     return { id: published.id, url: info.permalink };
+  },
+
+  async reply(account, { text, parent }) {
+    const { accessToken: token } = account.secrets as Record<string, string>;
+    const res = await api(
+      `${graph()}/${parent.id}/comments`,
+      { method: "POST", body: form({ message: text, access_token: token }) },
+      "Instagram comment",
+    );
+    return { id: res.id, url: parent.url };
   },
 };

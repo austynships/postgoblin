@@ -140,4 +140,19 @@ export const linkedin: Provider = {
     const urn = res.headers.get("x-restli-id") ?? "";
     return { id: urn, url: urn ? `https://www.linkedin.com/feed/update/${urn}` : undefined };
   },
+
+  async reply(account, { text, parent }) {
+    const { accessToken, author } = account.secrets as Record<string, string>;
+    const res = await fetch(`https://api.linkedin.com/rest/socialActions/${encodeURIComponent(parent.id)}/comments`, {
+      method: "POST",
+      headers: headers(accessToken),
+      body: JSON.stringify({ actor: author, object: parent.id, message: { text } }),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new ProviderError(`LinkedIn comment ${res.status}: ${detail.slice(0, 300)}`);
+    }
+    const id = res.headers.get("x-restli-id") ?? ((await res.json().catch(() => ({}))) as any).id ?? "";
+    return { id: String(id), url: parent.url };
+  },
 };

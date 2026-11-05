@@ -97,4 +97,17 @@ export const x: Provider = {
     );
     return { id: res.data.id, url: `https://x.com/${account.username ?? "i"}/status/${res.data.id}` };
   },
+
+  async reply(account, { text, parent }) {
+    const res = await api(
+      "https://api.x.com/2/tweets",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${(account.secrets as any).accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text, reply: { in_reply_to_tweet_id: parent.id } }),
+      },
+      "X reply",
+    );
+    return { id: res.data.id, url: `https://x.com/${account.username ?? "i"}/status/${res.data.id}` };
+  },
 };

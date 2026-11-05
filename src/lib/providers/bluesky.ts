@@ -109,7 +109,7 @@ export const bluesky: Provider = {
       record.embed = { $type: "app.bsky.embed.images", images: uploaded };
     }
 
-    const res = await api<{ uri: string }>(
+    const res = await api<{ uri: string; cid: string }>(
       `${service}/xrpc/com.atproto.repo.createRecord`,
       {
         method: "POST",
@@ -119,6 +119,33 @@ export const bluesky: Provider = {
       "Bluesky post",
     );
     const rkey = res.uri.split("/").pop();
-    return { id: res.uri, url: `https://bsky.app/profile/${session.handle}/post/${rkey}` };
+    return { id: res.uri, url: `https://bsky.app/profile/${session.handle}/post/${rkey}`, ref: { uri: res.uri, cid: res.cid } };
+  },
+
+  async reply(account, { text, parent, root }) {
+    const { service, identifier, password } = account.secrets as Record<string, string>;
+    if (!parent.ref?.cid || !root.ref?.cid) throw new ProviderError("Missing Bluesky post reference for the reply", false);
+    const session = await login(service, identifier, password);
+    const record = {
+      $type: "app.bsky.feed.post",
+      text,
+      createdAt: new Date().toISOString(),
+      facets: facets(text),
+      reply: {
+        root: { uri: root.ref.uri, cid: root.ref.cid },
+        parent: { uri: parent.ref.uri, cid: parent.ref.cid },
+      },
+    };
+    const res = await api<{ uri: string; cid: string }>(
+      `${service}/xrpc/com.atproto.repo.createRecord`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.accessJwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ repo: session.did, collection: "app.bsky.feed.post", record }),
+      },
+      "Bluesky reply",
+    );
+    const rkey = res.uri.split("/").pop();
+    return { id: res.uri, url: `https://bsky.app/profile/${session.handle}/post/${rkey}`, ref: { uri: res.uri, cid: res.cid } };
   },
 };

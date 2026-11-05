@@ -121,4 +121,22 @@ export const mastodon: Provider = {
     );
     return { id: status.id, url: status.url };
   },
+
+  async reply(account, { text, parent }) {
+    const { instance, accessToken } = account.secrets as Record<string, string>;
+    const status = await api(
+      `${instance}/api/v1/statuses`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({ status: text, in_reply_to_id: parent.id }),
+      },
+      "Mastodon reply",
+    );
+    return { id: status.id, url: status.url };
+  },
 };

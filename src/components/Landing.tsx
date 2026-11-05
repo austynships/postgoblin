@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LEGAL } from "@/lib/legal";
-import { GoblinIcon, Logo, ProviderIcon } from "./ui";
+import BrandIcon from "./BrandIcon";
+import { GoblinIcon, Logo } from "./ui";
 
 const PLATFORMS = [
   { id: "x", name: "X" },
@@ -146,11 +147,9 @@ function AgentDemo() {
                 {s.day} {s.time}
               </span>
               <span className="truncate text-ink/70">{s.text}</span>
-              <span className="ml-auto flex shrink-0 -space-x-1">
+              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-ink">
                 {s.platforms.map((p) => (
-                  <span key={p} className="rounded-full ring-2 ring-paper">
-                    <ProviderIcon provider={p} size={16} />
-                  </span>
+                  <BrandIcon key={p} provider={p} size={14} />
                 ))}
               </span>
             </div>
@@ -242,7 +241,7 @@ export default function Landing() {
             <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-7 gap-y-4">
               {PLATFORMS.map((p) => (
                 <li key={p.id} className="flex items-center gap-2 text-sm font-semibold text-ink/80">
-                  <ProviderIcon provider={p.id} size={26} />
+                  <BrandIcon provider={p.id} size={24} className="text-ink" />
                   {p.name}
                 </li>
               ))}

@@ -124,7 +124,7 @@ export default function Dashboard() {
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition ${
                 tab === t.id
-                  ? "bg-goblin-100 font-semibold text-ink ring-1 ring-goblin-500/50"
+                  ? "bg-goblin-100 font-semibold text-ink ring-1 ring-goblin-500/50 ring-inset"
                   : "text-ink/60 hover:bg-ink/[0.04] hover:text-ink"
               }`}
             >

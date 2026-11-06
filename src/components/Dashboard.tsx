@@ -107,7 +107,8 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex shrink-0 flex-row items-center gap-1 border-b border-ink/10 bg-surface p-2 md:w-56 md:flex-col md:items-stretch md:border-r md:border-b-0 md:p-4">
+      {/* On desktop the sidebar is pinned to the window height, so it looks the same on every tab however long the page is. */}
+      <aside className="flex shrink-0 flex-row items-center gap-1 border-b border-ink/10 bg-surface p-2 md:sticky md:top-0 md:h-screen md:w-56 md:flex-col md:items-stretch md:overflow-y-auto md:border-r md:border-b-0 md:p-4">
         <div className="mr-2 flex items-center px-1 md:mr-0 md:mb-6">
           <GoblinIcon size={36} className="md:hidden" />
           <Logo height={54} className="hidden max-w-full md:block" />

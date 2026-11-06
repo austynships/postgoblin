@@ -8,6 +8,7 @@ import Analytics from "./Analytics";
 import Calendar from "./Calendar";
 import Composer, { type ComposerSeed } from "./Composer";
 import FeedbackDialog, { type FeedbackMode } from "./FeedbackDialog";
+import { BACK_ICON, MORE_ICON, MobileTabBar, MoreSheet, type NavItem } from "./MobileNav";
 import PostsList from "./PostsList";
 import Settings from "./Settings";
 import { ThemeToggle } from "./Theme";
@@ -147,6 +148,7 @@ export default function Dashboard() {
   const [adminSection, setAdminSection] = useState<AdminSection>("overview");
   const [newFeedback, setNewFeedback] = useState(0);
   const [feedback, setFeedback] = useState<FeedbackMode | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
   const loadAccounts = useCallback(async () => {
@@ -199,10 +201,71 @@ export default function Dashboard() {
     window.location.href = "/login";
   }
 
+  // ---- Phone navigation: a bottom tab bar with the most used pages, the rest under "More". ----
+  const appItem = (id: Tab, label: string, icon: React.ReactNode, badge?: number): NavItem => ({
+    id,
+    label,
+    icon,
+    badge,
+    active: mode === "app" && tab === id,
+    onClick: () => {
+      setMode("app");
+      setTab(id);
+    },
+  });
+  const adminItem = (id: AdminSection, badge?: number): NavItem => {
+    const t = ADMIN_TABS.find((x) => x.id === id)!;
+    return { id, label: t.label, icon: t.icon, badge, active: mode === "admin" && adminSection === id, onClick: () => setAdminSection(id) };
+  };
+  const appMore: NavItem[] = [
+    appItem("analytics", "Analytics", NAV_ICONS.analytics),
+    appItem("accounts", "Accounts", NAV_ICONS.accounts),
+    appItem("settings", "Settings & MCP", NAV_ICONS.settings),
+  ];
+  const adminEntry: NavItem[] = me?.isAdmin
+    ? [{ id: "admin", label: "Admin", icon: SHIELD, badge: newFeedback, onClick: () => setMode("admin") }]
+    : [];
+  const adminMore: NavItem[] = [adminItem("reviews"), adminItem("revenue"), adminItem("plans")];
+  const moreItems = mode === "admin" ? adminMore : appMore;
+  const moreActive = moreItems.some((i) => i.active);
+  const moreButton: NavItem = {
+    id: "more",
+    label: "More",
+    icon: MORE_ICON,
+    active: moreActive || moreOpen,
+    badge: mode === "app" && me?.isAdmin ? newFeedback : undefined,
+    onClick: () => setMoreOpen(true),
+  };
+  const tabBar: NavItem[] =
+    mode === "admin"
+      ? [
+          { id: "back", label: "App", icon: BACK_ICON, onClick: () => setMode("app") },
+          adminItem("overview"),
+          adminItem("users"),
+          adminItem("feedback", newFeedback),
+          moreButton,
+        ]
+      : [
+          appItem("calendar", "Calendar", NAV_ICONS.calendar),
+          appItem("posts", "Posts", NAV_ICONS.posts, awaiting),
+          appItem("agent", "Agent", <GoblinIcon size={22} />),
+          moreButton,
+        ];
+
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
+      {/* Phone header: just the brand. Navigation lives in the bottom tab bar. */}
+      <header className="flex items-center justify-between border-b border-ink/10 bg-surface px-4 pt-[env(safe-area-inset-top)] md:hidden">
+        <div className="flex h-14 items-center">
+          <Logo height={34} />
+        </div>
+        {mode === "admin" && (
+          <span className="rounded-full bg-goblin-500/15 px-2.5 py-0.5 text-xs font-semibold text-goblin-800">Admin</span>
+        )}
+      </header>
+
       {/* On desktop the sidebar is pinned to the window height, so it looks the same on every tab however long the page is. */}
-      <aside className="flex shrink-0 flex-row items-center gap-1 border-b border-ink/10 bg-surface p-2 md:sticky md:top-0 md:h-screen md:w-56 md:flex-col md:items-stretch md:overflow-y-auto md:border-r md:border-b-0 md:p-4">
+      <aside className="hidden shrink-0 flex-col gap-1 border-r border-ink/10 bg-surface p-4 md:sticky md:top-0 md:flex md:h-screen md:w-56 md:overflow-y-auto">
         <div className="mr-2 flex items-center px-1 md:mr-0 md:mb-6">
           <GoblinIcon size={36} className="md:hidden" />
           <Logo height={54} className="hidden max-w-full md:block" />
@@ -291,7 +354,8 @@ export default function Dashboard() {
         )}
       </aside>
 
-      <main className="min-w-0 flex-1 p-4 md:p-8">
+      {/* Bottom padding on phones keeps content clear of the tab bar. */}
+      <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8">
         {notice && (
           <div
             className={`mb-4 flex items-start justify-between gap-4 rounded-lg px-4 py-3 text-sm ${
@@ -338,6 +402,18 @@ export default function Dashboard() {
           </>
         )}
       </main>
+
+      <MobileTabBar items={tabBar} onCreate={mode === "app" ? () => setComposer({}) : undefined} />
+      {moreOpen && (
+        <MoreSheet
+          items={moreItems}
+          extra={mode === "app" ? adminEntry : [{ id: "back", label: "Back to app", icon: BACK_ICON, onClick: () => setMode("app") }]}
+          user={me?.user ?? null}
+          onClose={() => setMoreOpen(false)}
+          onFeedback={setFeedback}
+          onLogout={logout}
+        />
+      )}
 
       {feedback && (
         <FeedbackDialog

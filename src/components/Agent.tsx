@@ -128,7 +128,7 @@ export default function Agent({
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4 md:h-[calc(100vh-4rem)]">
+    <div className="flex h-[calc(100dvh-9.5rem-1px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] gap-4 md:h-[calc(100vh-4rem)]">
       <aside className="hidden w-60 shrink-0 flex-col lg:flex">
         <button
           className="btn-ghost mb-3"

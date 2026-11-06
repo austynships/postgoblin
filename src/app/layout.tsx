@@ -9,6 +9,8 @@ const lilita = Lilita_One({ weight: "400", subsets: ["latin"], variable: "--font
 
 // Favicon and Apple touch icon come from src/app/icon.png and apple-icon.png.
 export const metadata: Metadata = {
+  // Makes share-preview images (Open Graph) absolute URLs on the real domain.
+  metadataBase: new URL(process.env.APP_URL || "https://postgoblins.com"),
   title: "PostGoblins",
   description: "Agentic social media scheduling",
 };

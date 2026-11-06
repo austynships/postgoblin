@@ -6,5 +6,5 @@ export const LEGAL = {
   governingLaw: "the State of Michigan, USA",
   venue: "the state and federal courts located in Michigan",
   effectiveDate: "October 30, 2026",
-  siteUrl: "https://postgoblin.vercel.app",
+  siteUrl: "https://postgoblins.com",
 } as const;

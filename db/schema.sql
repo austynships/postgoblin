@@ -146,3 +146,25 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
   content TEXT NOT NULL,
   created_at BIGINT NOT NULL
 );
+
+-- Feedback users send from the app (ideas, bugs). Read by staff in the admin panel.
+CREATE TABLE IF NOT EXISTS feedback (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL, -- idea | bug | other
+  message TEXT NOT NULL,
+  page TEXT,
+  status TEXT NOT NULL DEFAULT 'new', -- new | read | done
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback (created_at);
+
+-- One star rating per user (they can update it). allow_quote = OK to quote publicly.
+CREATE TABLE IF NOT EXISTS reviews (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT,
+  allow_quote BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);

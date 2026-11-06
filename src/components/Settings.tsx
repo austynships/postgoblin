@@ -40,10 +40,12 @@ export default function Settings({
   timezone,
   approveAgentPosts,
   onTimezoneSaved,
+  onFeedback,
 }: {
   timezone: string;
   approveAgentPosts: boolean;
   onTimezoneSaved: () => void;
+  onFeedback: (mode: "feedback" | "review") => void;
 }) {
   const [approveAgent, setApproveAgent] = useState(approveAgentPosts);
   const [keys, setKeys] = useState<Key[]>([]);
@@ -121,6 +123,17 @@ export default function Settings({
             <button className="btn-ghost" onClick={() => saveTz(browserTz)}>Use {browserTz}</button>
           )}
           {msg && <span className="text-sm text-goblin-800">{msg}</span>}
+        </div>
+      </section>
+
+      <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <h2 className="font-semibold">Help us improve</h2>
+          <p className="text-sm text-ink/60">Ideas, bugs or a quick rating all go straight to the PostGoblins team.</p>
+        </div>
+        <div className="flex gap-2">
+          <button className="btn-ghost" onClick={() => onFeedback("feedback")}>Send feedback</button>
+          <button className="btn-ghost" onClick={() => onFeedback("review")}>Rate PostGoblins</button>
         </div>
       </section>
 

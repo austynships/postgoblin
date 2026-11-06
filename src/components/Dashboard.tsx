@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Accounts from "./Accounts";
+import Admin from "./Admin";
 import Agent from "./Agent";
 import Analytics from "./Analytics";
 import Calendar from "./Calendar";
@@ -11,13 +12,14 @@ import Settings from "./Settings";
 import { ThemeToggle } from "./Theme";
 import { GoblinIcon, Logo, request, type AccountView, type ProviderInfo } from "./ui";
 
-type Tab = "calendar" | "posts" | "analytics" | "agent" | "accounts" | "settings";
+type Tab = "calendar" | "posts" | "analytics" | "agent" | "accounts" | "settings" | "admin";
 type Me = {
   user: { id: string; name: string; email: string; timezone: string };
   providers: ProviderInfo[];
   aiEnabled: boolean;
   directUploads: boolean;
   approveAgentPosts: boolean;
+  isAdmin: boolean;
 };
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -44,6 +46,12 @@ const NAV_ICONS: Record<Exclude<Tab, "agent">, React.ReactNode> = {
       <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
     </svg>
   ),
+  admin: (
+    <svg viewBox="0 0 24 24" width={18} height={18} {...stroke}>
+      <path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6l8-3z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  ),
   settings: (
     <svg viewBox="0 0 24 24" width={18} height={18} {...stroke}>
       <circle cx="12" cy="12" r="3" />
@@ -59,6 +67,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "agent", label: "Agent" },
   { id: "accounts", label: "Accounts" },
   { id: "settings", label: "Settings & MCP" },
+  { id: "admin", label: "Admin" },
 ];
 
 export default function Dashboard() {
@@ -86,6 +95,11 @@ export default function Dashboard() {
     if (q.get("error")) setNotice({ kind: "error", text: q.get("error")! });
     if (q.size) window.history.replaceState(null, "", "/");
   }, [loadAccounts]);
+
+  // Only staff on the admin list can open the Admin tab (e.g. via ?tab=admin).
+  useEffect(() => {
+    if (tab === "admin" && me && !me.isAdmin) setTab("calendar");
+  }, [tab, me]);
 
   // Badge on Posts for anything waiting for approval.
   useEffect(() => {
@@ -118,7 +132,7 @@ export default function Dashboard() {
           <span className="hidden sm:inline">New post</span>
         </button>
         <nav className="flex flex-1 gap-1 overflow-x-auto md:flex-col">
-          {TABS.map((t) => (
+          {TABS.filter((t) => t.id !== "admin" || me?.isAdmin).map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -198,6 +212,7 @@ export default function Dashboard() {
             onTimezoneSaved={() => request<Me>("/api/me").then(setMe)}
           />
         )}
+        {tab === "admin" && me?.isAdmin && <Admin />}
       </main>
 
       {composer && me && (

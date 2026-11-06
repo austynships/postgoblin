@@ -1,3 +1,4 @@
+import { isAdmin } from "@/lib/admin";
 import { aiEnabled } from "@/lib/agent";
 import { HttpError, handler, requireUser } from "@/lib/auth";
 import { run } from "@/lib/db";
@@ -14,6 +15,7 @@ export const GET = handler(async () => {
     aiEnabled: aiEnabled(),
     directUploads: directUploadsEnabled(),
     approveAgentPosts: await agentNeedsApproval(user.id),
+    isAdmin: isAdmin(user),
   });
 });
 

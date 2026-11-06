@@ -17,6 +17,7 @@ type Me = {
   providers: ProviderInfo[];
   aiEnabled: boolean;
   directUploads: boolean;
+  approveAgentPosts: boolean;
 };
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -67,6 +68,7 @@ export default function Dashboard() {
   const [composer, setComposer] = useState<ComposerSeed | null>(null);
   const [version, setVersion] = useState(0);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [awaiting, setAwaiting] = useState(0);
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
   const loadAccounts = useCallback(async () => {
@@ -84,6 +86,13 @@ export default function Dashboard() {
     if (q.get("error")) setNotice({ kind: "error", text: q.get("error")! });
     if (q.size) window.history.replaceState(null, "", "/");
   }, [loadAccounts]);
+
+  // Badge on Posts for anything waiting for approval.
+  useEffect(() => {
+    request<{ posts: unknown[] }>("/api/posts?status=pending_approval&limit=100")
+      .then((r) => setAwaiting(r.posts.length))
+      .catch(() => {});
+  }, [version]);
 
   // Keep statuses fresh while posts are publishing in the background.
   useEffect(() => {
@@ -120,6 +129,14 @@ export default function Dashboard() {
             >
               {t.id === "agent" ? <GoblinIcon size={20} /> : NAV_ICONS[t.id]}
               <span className="hidden sm:inline">{t.label}</span>
+              {t.id === "posts" && awaiting > 0 && (
+                <span
+                  className="ml-auto rounded-full bg-violet-500/15 px-1.5 text-[11px] font-semibold text-violet-700"
+                  title={`${awaiting} waiting for approval`}
+                >
+                  {awaiting}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -174,7 +191,11 @@ export default function Dashboard() {
           />
         )}
         {tab === "settings" && me && (
-          <Settings timezone={me.user.timezone} onTimezoneSaved={() => request<Me>("/api/me").then(setMe)} />
+          <Settings
+            timezone={me.user.timezone}
+            approveAgentPosts={me.approveAgentPosts}
+            onTimezoneSaved={() => request<Me>("/api/me").then(setMe)}
+          />
         )}
       </main>
 

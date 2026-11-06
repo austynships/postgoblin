@@ -36,7 +36,16 @@ function Snippet({ title, code }: { title: string; code: string }) {
   );
 }
 
-export default function Settings({ timezone, onTimezoneSaved }: { timezone: string; onTimezoneSaved: () => void }) {
+export default function Settings({
+  timezone,
+  approveAgentPosts,
+  onTimezoneSaved,
+}: {
+  timezone: string;
+  approveAgentPosts: boolean;
+  onTimezoneSaved: () => void;
+}) {
+  const [approveAgent, setApproveAgent] = useState(approveAgentPosts);
   const [keys, setKeys] = useState<Key[]>([]);
   const [name, setName] = useState("");
   const [fresh, setFresh] = useState<string | null>(null);
@@ -113,6 +122,40 @@ export default function Settings({ timezone, onTimezoneSaved }: { timezone: stri
           )}
           {msg && <span className="text-sm text-goblin-800">{msg}</span>}
         </div>
+      </section>
+
+      <section className="card space-y-3 p-5">
+        <h2 className="font-semibold">Approvals</h2>
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 accent-goblin-600"
+            checked={approveAgent}
+            onChange={async (e) => {
+              const value = e.target.checked;
+              setApproveAgent(value);
+              setError("");
+              try {
+                await request("/api/me", { method: "PATCH", body: { approveAgentPosts: value } });
+                onTimezoneSaved();
+              } catch (err) {
+                setApproveAgent(!value);
+                setError((err as Error).message);
+              }
+            }}
+          />
+          <span>
+            <span className="block text-sm font-medium">Require my approval for posts made by AI agents</span>
+            <span className="block text-sm text-ink/60">
+              Posts that Goblin or your MCP clients schedule wait under Posts → Needs approval until you approve them.
+              Drafts are unaffected.
+            </span>
+          </span>
+        </label>
+        <p className="text-xs text-ink/50">
+          To get sign-off from a client or teammate, use “Send for approval” on any post. It gives you a private review
+          link they can open without an account.
+        </p>
       </section>
 
       <section className="card space-y-5 p-5">

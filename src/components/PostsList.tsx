@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GoblinIcon, ProviderIcon, StatusPill, fmtDateTime, postTime, request, type PostView } from "./ui";
+import { CopyButton, GoblinIcon, ProviderIcon, StatusPill, fmtDateTime, postTime, request, type PostView } from "./ui";
 
 const FILTERS = [
   { id: "upcoming", label: "Upcoming", status: "scheduled,publishing" },
+  { id: "approval", label: "Needs approval", status: "pending_approval" },
   { id: "drafts", label: "Drafts", status: "draft" },
   { id: "published", label: "Published", status: "published,partial" },
   { id: "failed", label: "Failed", status: "failed,partial" },
@@ -20,26 +21,35 @@ export default function PostsList({
   onChanged: () => void;
 }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("upcoming");
+  const [busy, setBusy] = useState<string | null>(null);
   const [posts, setPosts] = useState<PostView[] | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const f = FILTERS.find((x) => x.id === filter)!;
+    // Ignore a slower response from a tab the user already left.
+    let stale = false;
     request<{ posts: PostView[] }>(`/api/posts?status=${f.status}&limit=300`).then((r) => {
+      if (stale) return;
       const list = filter === "failed" ? r.posts.filter((p) => p.targets.some((t) => t.status === "failed")) : r.posts;
       // Newest first for history, soonest first for upcoming.
-      setPosts(filter === "upcoming" ? list : [...list].reverse());
+      setPosts(filter === "upcoming" || filter === "approval" ? list : [...list].reverse());
     });
+    return () => {
+      stale = true;
+    };
   }, [filter, version]);
 
-  async function act(fn: () => Promise<unknown>) {
+  async function act(fn: () => Promise<unknown>, key = "") {
     setError("");
+    setBusy(key);
     try {
       await fn();
       onChanged();
     } catch (err) {
       setError((err as Error).message);
     }
+    setBusy(null);
   }
 
   return (
@@ -71,7 +81,11 @@ export default function PostsList({
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-ink/60">
                 <StatusPill status={p.status} />
                 <span>
-                  {p.status === "draft" ? "Draft · edited " + fmtDateTime(p.updatedAt) : fmtDateTime(postTime(p))}
+                  {p.status === "draft"
+                    ? "Draft · edited " + fmtDateTime(p.updatedAt)
+                    : p.status === "pending_approval" && !p.scheduledAt
+                      ? "Publishes when approved"
+                      : fmtDateTime(postTime(p))}
                 </span>
                 {p.createdBy === "agent" && (
                   <span className="flex items-center gap-1" title="Created by the agent">
@@ -112,17 +126,37 @@ export default function PostsList({
                     </span>
                   ))}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {p.status === "pending_approval" && p.approval?.link && (
+                    <CopyButton text={p.approval.link} label="Copy review link" className="btn-ghost py-1 text-xs" />
+                  )}
+                  {p.status === "pending_approval" && (
+                    <button
+                      className="btn-primary py-1 text-xs"
+                      disabled={busy === p.id}
+                      onClick={() =>
+                        act(() => request(`/api/posts/${p.id}/review`, { method: "POST", body: { decision: "approve" } }), p.id)
+                      }
+                    >
+                      {busy === p.id ? "Approving…" : "Approve"}
+                    </button>
+                  )}
                   {p.targets.some((t) => t.status === "failed") && (
                     <button className="btn-ghost py-1 text-xs" onClick={() => act(() => request(`/api/posts/${p.id}/retry`, { method: "POST" }))}>
                       Retry failed
                     </button>
                   )}
                   <button className="btn-ghost py-1 text-xs" onClick={() => onEdit(p)}>
-                    {["draft", "scheduled", "failed"].includes(p.status) ? "Edit" : "Details"}
+                    {["draft", "pending_approval", "scheduled", "failed"].includes(p.status) ? "Edit" : "Details"}
                   </button>
                 </div>
               </div>
+              {p.status === "draft" && p.approval?.status === "changes_requested" && (
+                <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs break-words whitespace-pre-wrap text-amber-700">
+                  Changes requested{p.approval.reviewerName ? ` by ${p.approval.reviewerName}` : ""}
+                  {p.approval.note ? `: ${p.approval.note}` : ""}
+                </p>
+              )}
               {p.targets
                 .filter((t) => t.error && t.status !== "published")
                 .map((t) => (

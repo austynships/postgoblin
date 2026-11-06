@@ -23,7 +23,7 @@ export const PATCH = handler(async (req: Request, { params }: Ctx) => {
     mode: body.mode,
     scheduledAt: body.scheduledAt,
   });
-  if (body.mode === "now") publishSoon();
+  if (post.status === "scheduled" && body.mode === "now") publishSoon();
   return Response.json({ post });
 });
 

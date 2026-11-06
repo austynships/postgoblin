@@ -52,6 +52,7 @@ How you work:
 - Times: every user message starts with a <context> block giving the current time and the user's timezone. Interpret times like "tomorrow at 9" in that timezone, and always pass scheduled_at as ISO-8601 with an explicit offset. Use find_open_slots when the user wants you to pick good times.
 - For a content calendar or campaign, schedule the whole series in one go, spaced sensibly, then summarise it as a short list (local time, platforms, first words of each post).
 - Scheduling and drafting are fine to do directly when asked. Publishing immediately (mode "now") and deleting posts are irreversible: only do them when the user has clearly asked for that specific action.
+- Approvals: posts can wait for sign-off (status pending_approval). Use mode "review" when the user wants a client or teammate to approve a post first, and give them the review_link to send. If the user has turned on "require approval for agent posts", your scheduled posts come back as pending_approval: tell the user they are waiting for their approval in PostGoblins (Posts → Needs approval). You can't approve posts yourself. If a post has approval.status "changes_requested", read the note, revise the post and send it for review again when asked.
 - If no accounts are connected, say so and point the user to the Accounts tab. Drafts can still be saved without accounts.
 - For questions about performance, call get_analytics and answer with the few numbers that matter (and what to post more of), not a data dump.
 - Keep replies brief and concrete. Don't paste raw ids at the user unless useful.`;
@@ -93,13 +94,13 @@ const tools: Tool[] = [
   {
     name: "create_post",
     description:
-      'Create a post for one or more accounts. mode "draft" saves it unscheduled, "schedule" publishes at scheduled_at, "now" publishes immediately.',
+      'Create a post for one or more accounts. mode "draft" saves it unscheduled, "schedule" publishes at scheduled_at, "now" publishes immediately, "review" sends it for approval (it publishes at scheduled_at, or as soon as approved if none, after someone approves it via the returned review_link). If the user requires approval for agent posts, "schedule" and "now" are turned into "review" automatically.',
     input_schema: {
       type: "object",
       properties: {
         content: { type: "string", description: "The post text exactly as it should appear." },
         account_ids: { type: "array", items: { type: "string" } },
-        mode: { type: "string", enum: ["draft", "schedule", "now"] },
+        mode: { type: "string", enum: ["draft", "schedule", "now", "review"] },
         scheduled_at: { type: "string", description: 'Required when mode is "schedule". ISO-8601 with offset.' },
         media_ids: { type: "array", items: { type: "string" }, description: "Ids from list_media." },
         first_comment: {
@@ -136,14 +137,14 @@ const tools: Tool[] = [
   {
     name: "update_post",
     description:
-      "Edit a draft, scheduled or failed post: text, accounts, media, time, or mode (e.g. turn a draft into a scheduled post).",
+      "Edit a draft, scheduled, pending-approval or failed post: text, accounts, media, time, or mode (e.g. turn a draft into a scheduled post). A post waiting for approval stays waiting (same review link) unless you change its mode. Agents can't approve posts.",
     input_schema: {
       type: "object",
       properties: {
         post_id: { type: "string" },
         content: { type: "string" },
         account_ids: { type: "array", items: { type: "string" } },
-        mode: { type: "string", enum: ["draft", "schedule", "now"] },
+        mode: { type: "string", enum: ["draft", "schedule", "now", "review"] },
         scheduled_at: { type: "string", description: "ISO-8601 with offset" },
         media_ids: { type: "array", items: { type: "string" } },
         first_comment: {
@@ -284,6 +285,16 @@ function summarizePost(p: PostView, tz: string) {
     ...(p.options.firstComment ? { first_comment: p.options.firstComment } : {}),
     ...(p.options.youtube ? { youtube: p.options.youtube } : {}),
     created_by: p.createdBy,
+    ...(p.approval
+      ? {
+          approval: {
+            status: p.approval.status,
+            ...(p.approval.link ? { review_link: p.approval.link } : {}),
+            ...(p.approval.reviewerName ? { reviewer: p.approval.reviewerName } : {}),
+            ...(p.approval.note ? { note: p.approval.note } : {}),
+          },
+        }
+      : {}),
     targets: p.targets.map((t) => ({
       account_id: t.accountId,
       platform: t.provider,
@@ -355,8 +366,15 @@ export async function runTool(
         },
         "agent",
       );
-      if (input.mode === "now") publishSoon();
-      const verb = input.mode === "draft" ? "Drafted" : input.mode === "now" ? "Publishing" : "Scheduled";
+      if (post.status === "scheduled" && input.mode === "now") publishSoon();
+      const verb =
+        post.status === "pending_approval"
+          ? "Sent for approval"
+          : input.mode === "draft"
+            ? "Drafted"
+            : input.mode === "now"
+              ? "Publishing"
+              : "Scheduled";
       return {
         result: summarizePost(post, tz),
         action: { tool: name, ok: true, postId: post.id, summary: `${verb}: “${post.content.slice(0, 60)}”` },
@@ -372,8 +390,8 @@ export async function runTool(
         mediaIds: input.media_ids,
         mode: input.mode,
         scheduledAt: input.scheduled_at !== undefined ? time(input.scheduled_at) : undefined,
-      });
-      if (input.mode === "now") publishSoon();
+      }, "agent");
+      if (post.status === "scheduled" && input.mode === "now") publishSoon();
       return {
         result: summarizePost(post, tz),
         action: { tool: name, ok: true, postId: post.id, summary: `Updated: “${post.content.slice(0, 60)}”` },

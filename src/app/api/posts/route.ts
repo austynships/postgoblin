@@ -21,7 +21,7 @@ export const GET = handler(async (req: Request) => {
 export const POST = handler(async (req: Request) => {
   const user = await requireUser();
   const body = await req.json();
-  if (!["draft", "schedule", "now"].includes(body.mode)) throw new HttpError(400, "Invalid mode");
+  if (!["draft", "schedule", "now", "review"].includes(body.mode)) throw new HttpError(400, "Invalid mode");
   const post = await createPost(user.id, {
     content: String(body.content ?? ""),
     accountIds: body.accountIds ?? [],
@@ -30,6 +30,6 @@ export const POST = handler(async (req: Request) => {
     mode: body.mode,
     scheduledAt: body.scheduledAt ?? null,
   });
-  if (body.mode === "now") publishSoon();
+  if (post.status === "scheduled" && body.mode === "now") publishSoon();
   return Response.json({ post });
 });

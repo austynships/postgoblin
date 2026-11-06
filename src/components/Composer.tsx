@@ -16,7 +16,7 @@ import {
   type YouTubeOptions,
   type YouTubePrivacy,
 } from "@/lib/postOptions";
-import { Avatar, Modal, ProviderIcon, StatusPill, request, type AccountView, type PostView, type ProviderInfo } from "./ui";
+import { Avatar, CopyButton, Modal, ProviderIcon, StatusPill, request, type AccountView, type PostView, type ProviderInfo } from "./ui";
 
 export type ComposerSeed = { post?: PostView; at?: number };
 type Media = PostView["media"][number];
@@ -228,7 +228,7 @@ export default function Composer({
     setBusy(null);
   }
 
-  async function save(mode: "draft" | "schedule" | "now") {
+  async function save(mode: "draft" | "schedule" | "now" | "review") {
     setBusy(mode);
     setError("");
     const body = {
@@ -241,10 +241,27 @@ export default function Composer({
         firstComment: firstComment.trim() || undefined,
         youtube: { ...yt, tags: parseTags(ytTags), thumbnailId: thumb?.id } },
       mode,
-      scheduledAt: mode === "schedule" ? new Date(when).getTime() : null,
+      scheduledAt: mode === "schedule" || mode === "review" ? new Date(when).getTime() : null,
     };
     try {
-      await request(post ? `/api/posts/${post.id}` : "/api/posts", { method: post ? "PATCH" : "POST", body });
+      const res = await request<{ post: PostView }>(post ? `/api/posts/${post.id}` : "/api/posts", {
+        method: post ? "PATCH" : "POST",
+        body,
+      });
+      if (mode === "review") {
+        const link = res.post.approval?.link;
+        let copied = false;
+        try {
+          if (link) await navigator.clipboard.writeText(link);
+          copied = !!link;
+        } catch {}
+        onSaved(
+          copied
+            ? "Sent for approval. Review link copied: send it to whoever should approve it."
+            : "Sent for approval. Copy the review link from Posts → Needs approval.",
+        );
+        return;
+      }
       onSaved(
         mode === "draft"
           ? "Draft saved"
@@ -706,6 +723,28 @@ export default function Composer({
 
         {/* Right rail: schedule + preview */}
         <div className="space-y-5 border-t border-ink/10 p-5 lg:border-t-0 lg:border-l">
+          {post?.status === "pending_approval" && (
+            <div className="space-y-2 rounded-lg border border-violet-500/30 bg-violet-500/10 p-3 text-sm">
+              <div className="font-medium text-violet-700">Waiting for approval</div>
+              <p className="text-xs text-ink/70">
+                {post.approval?.requestedBy === "agent" ? "The agent made this post. " : ""}
+                Approve it to schedule it, or send the review link to whoever should sign off. Edits you save keep the same link.
+              </p>
+              {post.approval?.link && (
+                <div className="flex items-center gap-2 rounded-md border border-ink/10 bg-surface px-2 py-1.5">
+                  <code className="min-w-0 flex-1 truncate text-xs text-ink/70">{post.approval.link}</code>
+                  <CopyButton text={post.approval.link} label="Copy" className="shrink-0 text-xs text-goblin-800 hover:underline" />
+                </div>
+              )}
+            </div>
+          )}
+          {post?.status === "draft" && post.approval?.status === "changes_requested" && (
+            <div className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-700">
+              <div className="font-medium">Changes requested{post.approval.reviewerName ? ` by ${post.approval.reviewerName}` : ""}</div>
+              {post.approval.note && <p className="mt-1 text-xs break-words whitespace-pre-wrap">{post.approval.note}</p>}
+            </div>
+          )}
+
           {!locked && (
             <div>
               <label className="label" htmlFor="when">Schedule for</label>
@@ -786,7 +825,13 @@ export default function Composer({
                 disabled={!!busy || blocked || !selected.length || (!hasText && !media.length)}
                 onClick={() => save("schedule")}
               >
-                {busy === "schedule" ? "Scheduling…" : post?.status === "scheduled" ? "Update schedule" : "Schedule"}
+                {busy === "schedule"
+                  ? "Scheduling…"
+                  : post?.status === "pending_approval"
+                    ? "Approve & schedule"
+                    : post?.status === "scheduled"
+                      ? "Update schedule"
+                      : "Schedule"}
               </button>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -800,6 +845,14 @@ export default function Composer({
                   {busy === "draft" ? "Saving…" : "Save draft"}
                 </button>
               </div>
+              <button
+                className="btn-ghost w-full"
+                disabled={!!busy || blocked || !selected.length || (!hasText && !media.length)}
+                onClick={() => save("review")}
+                title="Holds the post until someone approves it, then it publishes at the time above"
+              >
+                {busy === "review" ? "Saving…" : post?.status === "pending_approval" ? "Save, keep waiting for approval" : "Send for approval"}
+              </button>
             </div>
           )}
           {post && post.status !== "publishing" && (

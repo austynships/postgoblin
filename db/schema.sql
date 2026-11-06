@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   timezone TEXT NOT NULL DEFAULT 'UTC',
   created_at BIGINT NOT NULL
 );
+-- off = posts publish as scheduled; agent = posts made by the AI agent / MCP wait for approval.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS approval_required TEXT NOT NULL DEFAULT 'off';
 
 CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
@@ -86,6 +88,22 @@ CREATE TABLE IF NOT EXISTS post_metrics (
   fetched_at BIGINT NOT NULL,
   error TEXT
 );
+
+-- Approval requests. A post waiting for sign-off has status pending_approval and
+-- one pending row here; the token is the private review link sent to the reviewer.
+CREATE TABLE IF NOT EXISTS post_approvals (
+  id TEXT PRIMARY KEY,
+  post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending | approved | changes_requested | cancelled
+  requested_by TEXT NOT NULL DEFAULT 'user',
+  reviewer_name TEXT,
+  note TEXT,
+  decided_by TEXT, -- owner | link
+  requested_at BIGINT NOT NULL,
+  decided_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_post_approvals_post ON post_approvals (post_id, requested_at);
 
 CREATE TABLE IF NOT EXISTS oauth_states (
   state TEXT PRIMARY KEY,

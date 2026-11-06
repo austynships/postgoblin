@@ -1,6 +1,6 @@
 import { getAccountsByIds } from "./accounts";
-import { HttpError } from "./auth";
-import { id } from "./crypto";
+import { HttpError, appUrl } from "./auth";
+import { id, randomToken } from "./crypto";
 import { all, now, one, run, tx } from "./db";
 import { CHAR_LIMITS, countChars } from "./limits";
 import { getMedia, publicMedia, type PublicMedia } from "./media";
@@ -18,7 +18,49 @@ import {
 } from "./postOptions";
 import { getProvider } from "./providers";
 
-export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "partial" | "failed";
+export type PostStatus = "draft" | "pending_approval" | "scheduled" | "publishing" | "published" | "partial" | "failed";
+
+/** The latest approval request for a post (null when it was never sent for approval). */
+export type ApprovalView = {
+  status: "pending" | "approved" | "changes_requested" | "cancelled";
+  /** Private review link; only shown while the request is pending. */
+  link: string | null;
+  requestedBy: "user" | "agent";
+  reviewerName: string | null;
+  note: string | null;
+  decidedBy: "owner" | "link" | null;
+  requestedAt: number;
+  decidedAt: number | null;
+};
+
+type ApprovalRow = {
+  id: string;
+  post_id: string;
+  token: string;
+  status: ApprovalView["status"];
+  requested_by: "user" | "agent";
+  reviewer_name: string | null;
+  note: string | null;
+  decided_by: "owner" | "link" | null;
+  requested_at: number;
+  decided_at: number | null;
+};
+
+export const reviewLink = (token: string) => `${appUrl()}/review/${token}`;
+
+function approvalView(r: ApprovalRow | undefined): ApprovalView | null {
+  if (!r) return null;
+  return {
+    status: r.status,
+    link: r.status === "pending" ? reviewLink(r.token) : null,
+    requestedBy: r.requested_by,
+    reviewerName: r.reviewer_name,
+    note: r.note,
+    decidedBy: r.decided_by,
+    requestedAt: r.requested_at,
+    decidedAt: r.decided_at,
+  };
+}
 
 export type PostView = {
   id: string;
@@ -33,6 +75,7 @@ export type PostView = {
   createdBy: "user" | "agent";
   createdAt: number;
   updatedAt: number;
+  approval: ApprovalView | null;
   targets: {
     accountId: string;
     provider: string;
@@ -65,8 +108,11 @@ export type PostInput = {
   mediaIds?: string[];
   /** Per-platform settings (e.g. YouTube title, privacy, made for kids). */
   options?: PostOptions;
-  /** draft = save only, schedule = publish at scheduledAt, now = publish immediately */
-  mode: "draft" | "schedule" | "now";
+  /**
+   * draft = save only, schedule = publish at scheduledAt, now = publish immediately,
+   * review = wait for approval, then publish at scheduledAt (or right away if that has passed / is empty).
+   */
+  mode: "draft" | "schedule" | "now" | "review";
   scheduledAt?: number | null;
 };
 
@@ -78,6 +124,11 @@ async function hydrate(userId: string, rows: PostRow[]): Promise<PostView[]> {
      WHERE t.post_id IN (${rows.map(() => "?").join(",")})`,
     rows.map((r) => r.id),
   );
+  const approvals = await all<ApprovalRow>(
+    `SELECT * FROM post_approvals WHERE post_id IN (${rows.map(() => "?").join(",")}) ORDER BY requested_at ASC`,
+    rows.map((r) => r.id),
+  );
+  const latest = new Map(approvals.map((a) => [a.post_id, a]));
   return Promise.all(
     rows.map(async (r) => {
       const mediaIds = JSON.parse(r.media) as string[];
@@ -104,6 +155,7 @@ async function hydrate(userId: string, rows: PostRow[]): Promise<PostView[]> {
         createdBy: r.created_by,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
+        approval: approvalView(latest.get(r.id)),
         targets: targets
           .filter((t) => t.post_id === r.id)
           .map((t) => ({
@@ -192,6 +244,10 @@ async function validate(userId: string, input: PostInput) {
     if (!input.scheduledAt || Number.isNaN(input.scheduledAt)) throw new HttpError(400, "Pick a date and time");
     if (input.scheduledAt < now() - 60_000) throw new HttpError(400, "Scheduled time is in the past");
   }
+  if (input.mode === "review" && input.scheduledAt) {
+    if (Number.isNaN(input.scheduledAt)) throw new HttpError(400, "Invalid date and time");
+    if (input.scheduledAt < now() - 60_000) throw new HttpError(400, "Scheduled time is in the past");
+  }
   if (problems.length && input.mode !== "draft") {
     throw new HttpError(400, `Can't post to some platforms — ${problems.join("; ")}`);
   }
@@ -209,7 +265,26 @@ async function validate(userId: string, input: PostInput) {
 }
 
 function statusFor(mode: PostInput["mode"]): PostStatus {
-  return mode === "draft" ? "draft" : "scheduled";
+  return mode === "draft" ? "draft" : mode === "review" ? "pending_approval" : "scheduled";
+}
+
+/** Whether this user wants posts made by the AI agent (in-app or MCP) held for approval. */
+export async function agentNeedsApproval(userId: string) {
+  const row = await one<{ approval_required: string }>("SELECT approval_required FROM users WHERE id = ?", [userId]);
+  return row?.approval_required === "agent";
+}
+
+/** The agent can't publish on its own when approval is required: schedule/now become review. */
+async function effectiveMode(userId: string, mode: PostInput["mode"], actor: "user" | "agent"): Promise<PostInput["mode"]> {
+  if (actor === "agent" && (mode === "schedule" || mode === "now") && (await agentNeedsApproval(userId))) return "review";
+  return mode;
+}
+
+function approvalInsert(postId: string, requestedBy: "user" | "agent"): [string, unknown[]] {
+  return [
+    "INSERT INTO post_approvals (id, post_id, token, requested_by, requested_at) VALUES (?, ?, ?, ?, ?)",
+    [id("apr_"), postId, randomToken(24), requestedBy, now()],
+  ];
 }
 
 function targetInserts(postId: string, accountIds: string[]): [string, unknown[]][] {
@@ -220,6 +295,7 @@ function targetInserts(postId: string, accountIds: string[]): [string, unknown[]
 }
 
 export async function createPost(userId: string, input: PostInput, createdBy: "user" | "agent" = "user"): Promise<PostView> {
+  input = { ...input, mode: await effectiveMode(userId, input.mode, createdBy) };
   const { content, mediaIds, options } = await validate(userId, input);
   const postId = id("post_");
   const t = now();
@@ -231,11 +307,20 @@ export async function createPost(userId: string, input: PostInput, createdBy: "u
       [postId, userId, content, JSON.stringify(mediaIds), JSON.stringify(options), statusFor(input.mode), scheduledAt, createdBy, t, t],
     ],
     ...targetInserts(postId, input.accountIds),
+    ...(input.mode === "review" ? [approvalInsert(postId, createdBy)] : []),
   ]);
   return getPost(userId, postId);
 }
 
-export async function updatePost(userId: string, postId: string, patch: Partial<PostInput>): Promise<PostView> {
+const defaultMode = (status: PostStatus): PostInput["mode"] =>
+  status === "draft" ? "draft" : status === "pending_approval" ? "review" : "schedule";
+
+export async function updatePost(
+  userId: string,
+  postId: string,
+  patch: Partial<PostInput>,
+  actor: "user" | "agent" = "user",
+): Promise<PostView> {
   const existing = await getPost(userId, postId);
   if (existing.status === "publishing" || existing.status === "published" || existing.status === "partial") {
     throw new HttpError(409, `Post is ${existing.status} and can no longer be edited`);
@@ -245,9 +330,22 @@ export async function updatePost(userId: string, postId: string, patch: Partial<
     accountIds: patch.accountIds ?? existing.targets.map((t) => t.accountId),
     mediaIds: patch.mediaIds ?? existing.media.map((m) => m.id),
     options: patch.options ?? existing.options,
-    mode: patch.mode ?? (existing.status === "draft" ? "draft" : "schedule"),
+    mode: await effectiveMode(userId, patch.mode ?? defaultMode(existing.status), actor),
     scheduledAt: patch.scheduledAt !== undefined ? patch.scheduledAt : existing.scheduledAt,
   };
+  // An edited post that was waiting keeps its review link; anything else closes the request.
+  const wasPending = existing.status === "pending_approval";
+  const approvalChanges: [string, unknown[]][] = [];
+  if (merged.mode === "review") {
+    if (!wasPending) approvalChanges.push(approvalInsert(postId, actor));
+  } else if (wasPending) {
+    // The owner scheduling it themselves counts as approving it.
+    const approved = actor === "user" && merged.mode !== "draft";
+    approvalChanges.push([
+      `UPDATE post_approvals SET status = ?, decided_by = ?, decided_at = ? WHERE post_id = ? AND status = 'pending'`,
+      [approved ? "approved" : "cancelled", approved ? "owner" : null, now(), postId],
+    ]);
+  }
   const { content, mediaIds, options } = await validate(userId, merged);
   const scheduledAt = merged.mode === "now" ? now() : (merged.scheduledAt ?? null);
   // Targets are reset: a failed post that is rescheduled gets fresh attempts.
@@ -258,8 +356,77 @@ export async function updatePost(userId: string, postId: string, patch: Partial<
     ],
     ["DELETE FROM post_targets WHERE post_id = ?", [postId]],
     ...targetInserts(postId, merged.accountIds),
+    ...approvalChanges,
   ]);
   return getPost(userId, postId);
+}
+
+/**
+ * Approve or send back a post that is waiting for approval. Approving schedules it
+ * for its planned time, or for right now when no time was set or it has passed.
+ */
+export async function decideApproval(
+  userId: string,
+  postId: string,
+  decision: { approve: boolean; by: "owner" | "link"; name?: string | null; note?: string | null },
+): Promise<PostView> {
+  const post = await getPost(userId, postId);
+  if (post.status !== "pending_approval") {
+    throw new HttpError(409, "This post isn't waiting for approval");
+  }
+  const name = decision.name?.trim().slice(0, 80) || null;
+  const note = decision.note?.trim().slice(0, 2000) || null;
+  const t = now();
+  let scheduledAt: number | null = null;
+  if (decision.approve) {
+    scheduledAt = Math.max(post.scheduledAt ?? t, t);
+    // Platforms and media may have changed since it was submitted; check again before it can publish.
+    await validate(userId, {
+      content: post.content,
+      accountIds: post.targets.map((x) => x.accountId),
+      mediaIds: post.media.map((m) => m.id),
+      options: post.options,
+      mode: "schedule",
+      scheduledAt,
+    });
+  } else if (decision.by === "link" && !note) {
+    throw new HttpError(400, "Say what should change");
+  }
+  // Conditional on the status so two reviewers clicking at once can't both win.
+  const claimed = await one<{ id: string }>(
+    "UPDATE posts SET status = ?, scheduled_at = COALESCE(?, scheduled_at), updated_at = ? WHERE id = ? AND user_id = ? AND status = 'pending_approval' RETURNING id",
+    [decision.approve ? "scheduled" : "draft", scheduledAt, t, postId, userId],
+  );
+  if (!claimed) throw new HttpError(409, "This post is no longer waiting for approval");
+  await run(
+    `UPDATE post_approvals SET status = ?, decided_by = ?, reviewer_name = ?, note = ?, decided_at = ?
+     WHERE post_id = ? AND status = 'pending'`,
+    [decision.approve ? "approved" : "changes_requested", decision.by, name, note, t, postId],
+  );
+  return getPost(userId, postId);
+}
+
+/** What the public review page needs. Null when the link is unknown. */
+export async function getReview(token: string) {
+  const row = await one<ApprovalRow & { user_id: string; owner_name: string }>(
+    `SELECT a.*, p.user_id, u.name AS owner_name FROM post_approvals a
+     JOIN posts p ON p.id = a.post_id JOIN users u ON u.id = p.user_id WHERE a.token = ?`,
+    [token],
+  );
+  if (!row) return null;
+  // Only the newest request for a post is live; older links show as closed.
+  const newest = await one<{ id: string }>(
+    "SELECT id FROM post_approvals WHERE post_id = ? ORDER BY requested_at DESC LIMIT 1",
+    [row.post_id],
+  );
+  const post = await getPost(row.user_id, row.post_id);
+  return {
+    userId: row.user_id,
+    ownerName: row.owner_name,
+    open: newest?.id === row.id && row.status === "pending" && post.status === "pending_approval",
+    request: { ...approvalView(row)!, link: null },
+    post,
+  };
 }
 
 export async function deletePost(userId: string, postId: string) {

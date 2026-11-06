@@ -3,6 +3,7 @@
 import type { AccountView } from "@/lib/accounts";
 import type { PostView } from "@/lib/posts";
 import type { ProviderInfo } from "@/lib/providers";
+import { useState } from "react";
 import BrandIcon from "./BrandIcon";
 
 export type { AccountView, PostView, ProviderInfo };
@@ -61,6 +62,7 @@ export function Avatar({ account, size = 36 }: { account: { avatar: string | nul
 
 const STATUS_STYLE: Record<string, string> = {
   draft: "bg-ink/10 text-ink/80",
+  pending_approval: "bg-violet-500/15 text-violet-700",
   scheduled: "bg-sky-500/15 text-sky-700",
   publishing: "bg-amber-500/15 text-amber-700",
   sending: "bg-amber-500/15 text-amber-700",
@@ -70,11 +72,35 @@ const STATUS_STYLE: Record<string, string> = {
   failed: "bg-red-500/15 text-red-700",
 };
 
+const STATUS_LABEL: Record<string, string> = { pending_approval: "needs approval" };
+
 export function StatusPill({ status }: { status: string }) {
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLE[status] ?? ""}`}>
-      {status}
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap capitalize ${STATUS_STYLE[status] ?? ""}`}>
+      {STATUS_LABEL[status] ?? status}
     </span>
+  );
+}
+
+/** Copies text and briefly says so. */
+export function CopyButton({ text, label = "Copy link", className = "" }: { text: string; label?: string; className?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setDone(true);
+          setTimeout(() => setDone(false), 1500);
+        } catch {
+          window.prompt("Copy this link:", text);
+        }
+      }}
+    >
+      {done ? "Copied ✓" : label}
+    </button>
   );
 }
 

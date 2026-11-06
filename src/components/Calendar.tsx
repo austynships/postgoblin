@@ -188,6 +188,7 @@ export default function Calendar({
 function Dot({ status }: { status: string }) {
   const c: Record<string, string> = {
     draft: "bg-zinc-400",
+    pending_approval: "bg-violet-400",
     scheduled: "bg-sky-400",
     publishing: "bg-amber-400",
     published: "bg-goblin-400",
